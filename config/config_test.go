@@ -14,6 +14,7 @@
 package config
 
 import (
+	"bytes"
 	"encoding/json"
 	"io/ioutil"
 	"net/url"
@@ -25,7 +26,7 @@ import (
 
 	config_util "github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
 	"github.com/prometheus/prometheus/discovery/azure"
 	sd_config "github.com/prometheus/prometheus/discovery/config"
@@ -926,7 +927,7 @@ var expectedErrors = []struct {
 	},
 	{
 		filename: "section_key_dup.bad.yml",
-		errMsg:   "field scrape_configs already set in type config.plain",
+		errMsg:   `mapping key "scrape_configs" already defined`,
 	},
 	{
 		filename: "azure_client_id_missing.bad.yml",
@@ -1007,7 +1008,9 @@ func TestBadStaticConfigsYML(t *testing.T) {
 	content, err := ioutil.ReadFile("testdata/static_config.bad.yml")
 	testutil.Ok(t, err)
 	var tg targetgroup.Group
-	err = yaml.UnmarshalStrict(content, &tg)
+	dec := yaml.NewDecoder(bytes.NewReader(content))
+	dec.KnownFields(true)
+	err = dec.Decode(&tg)
 	testutil.NotOk(t, err)
 }
 

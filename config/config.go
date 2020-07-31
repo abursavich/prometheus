@@ -15,6 +15,7 @@ package config
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/url"
 	"path/filepath"
@@ -25,7 +26,7 @@ import (
 	"github.com/pkg/errors"
 	config_util "github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
-	yaml "gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
 	sd_config "github.com/prometheus/prometheus/discovery/config"
 	"github.com/prometheus/prometheus/pkg/labels"
@@ -44,8 +45,9 @@ func Load(s string) (*Config, error) {
 	// point as well.
 	*cfg = DefaultConfig
 
-	err := yaml.UnmarshalStrict([]byte(s), cfg)
-	if err != nil {
+	dec := yaml.NewDecoder(strings.NewReader(s))
+	dec.KnownFields(true)
+	if err := dec.Decode(cfg); err != nil && err != io.EOF {
 		return nil, err
 	}
 	cfg.original = s

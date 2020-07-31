@@ -14,14 +14,16 @@
 package scrape
 
 import (
+	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/common/model"
-	yaml "gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
 	"github.com/prometheus/prometheus/config"
 	"github.com/prometheus/prometheus/discovery/targetgroup"
@@ -222,12 +224,14 @@ func TestPopulateLabels(t *testing.T) {
 	}
 }
 
-func loadConfiguration(t *testing.T, c string) *config.Config {
+func unmarshalConfig(t *testing.T, c string) *config.Config {
 	t.Helper()
 
 	cfg := &config.Config{}
-	if err := yaml.UnmarshalStrict([]byte(c), cfg); err != nil {
-		t.Fatalf("Unable to load YAML config: %s", err)
+	dec := yaml.NewDecoder(strings.NewReader(c))
+	dec.KnownFields(true)
+	if err := dec.Decode(cfg); err != nil && err != io.EOF {
+		t.Fatalf("Unable to load YAML config: %v", err)
 	}
 	return cfg
 }
@@ -266,9 +270,9 @@ scrape_configs:
    - targets: ["foo:9090"]
 `
 	var (
-		cfg1 = loadConfiguration(t, cfgText1)
-		cfg2 = loadConfiguration(t, cfgText2)
-		cfg3 = loadConfiguration(t, cfgText3)
+		cfg1 = unmarshalConfig(t, cfgText1)
+		cfg2 = unmarshalConfig(t, cfgText2)
+		cfg3 = unmarshalConfig(t, cfgText3)
 
 		ch = make(chan struct{}, 1)
 	)
@@ -378,13 +382,7 @@ global:
  external_labels:
    prometheus: '` + prometheus + `'
 `
-
-		cfg := &config.Config{}
-		if err := yaml.UnmarshalStrict([]byte(cfgText), cfg); err != nil {
-			t.Fatalf("Unable to load YAML config cfgYaml: %s", err)
-		}
-
-		return cfg
+		return unmarshalConfig(t, cfgText)
 	}
 
 	scrapeManager := NewManager(nil, nil)

@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"github.com/prometheus/prometheus/util/testutil"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 func TestForNilSDConfig(t *testing.T) {

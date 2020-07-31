@@ -16,11 +16,13 @@ package discovery
 import (
 	"context"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"reflect"
 	"sort"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -34,7 +36,7 @@ import (
 	"github.com/prometheus/prometheus/discovery/file"
 	"github.com/prometheus/prometheus/discovery/targetgroup"
 	"github.com/prometheus/prometheus/util/testutil"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 func TestMain(m *testing.M) {
@@ -925,15 +927,9 @@ scrape_configs:
    - targets: ["bar:9090"]
    - targets: ["baz:9090"]
 `
-	originalConfig := &config.Config{}
-	if err := yaml.UnmarshalStrict([]byte(cfgText), originalConfig); err != nil {
-		t.Fatalf("Unable to load YAML config cfgYaml: %s", err)
-	}
+	originalConfig := unmarshalConfig(t, cfgText)
+	processedConfig := unmarshalConfig(t, cfgText)
 
-	processedConfig := &config.Config{}
-	if err := yaml.UnmarshalStrict([]byte(cfgText), processedConfig); err != nil {
-		t.Fatalf("Unable to load YAML config cfgYaml: %s", err)
-	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	discoveryManager := NewManager(ctx, log.NewNopLogger())
@@ -953,6 +949,18 @@ scrape_configs:
 				origSdcfg.StaticConfigs, sdcfg.StaticConfigs)
 		}
 	}
+}
+
+func unmarshalConfig(t *testing.T, c string) *config.Config {
+	t.Helper()
+
+	cfg := &config.Config{}
+	dec := yaml.NewDecoder(strings.NewReader(c))
+	dec.KnownFields(true)
+	if err := dec.Decode(cfg); err != nil && err != io.EOF {
+		t.Fatalf("Unable to load YAML config: %v", err)
+	}
+	return cfg
 }
 
 func TestGaugeFailedConfigs(t *testing.T) {

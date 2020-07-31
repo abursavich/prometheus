@@ -18,10 +18,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -30,7 +32,7 @@ import (
 	config_util "github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
 	"go.uber.org/atomic"
-	yaml "gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
 	"github.com/prometheus/prometheus/config"
 	"github.com/prometheus/prometheus/discovery/targetgroup"
@@ -460,15 +462,12 @@ func TestReload(t *testing.T) {
 
 	n := NewManager(&Options{}, nil)
 
-	cfg := &config.Config{}
 	s := `
 alerting:
   alertmanagers:
   - static_configs:
 `
-	if err := yaml.UnmarshalStrict([]byte(s), cfg); err != nil {
-		t.Fatalf("Unable to load YAML config: %s", err)
-	}
+	cfg := unmarshalConfig(t, s)
 	testutil.Equals(t, 1, len(cfg.AlertingConfig.AlertmanagerConfigs))
 
 	if err := n.ApplyConfig(cfg); err != nil {
@@ -510,7 +509,6 @@ func TestDroppedAlertmanagers(t *testing.T) {
 
 	n := NewManager(&Options{}, nil)
 
-	cfg := &config.Config{}
 	s := `
 alerting:
   alertmanagers:
@@ -520,9 +518,7 @@ alerting:
         regex: 'alertmanager:9093'
         action: drop
 `
-	if err := yaml.UnmarshalStrict([]byte(s), cfg); err != nil {
-		t.Fatalf("Unable to load YAML config: %s", err)
-	}
+	cfg := unmarshalConfig(t, s)
 	testutil.Equals(t, 1, len(cfg.AlertingConfig.AlertmanagerConfigs))
 
 	if err := n.ApplyConfig(cfg); err != nil {
@@ -543,6 +539,18 @@ alerting:
 
 		testutil.Equals(t, res, tt.out)
 	}
+}
+
+func unmarshalConfig(t *testing.T, c string) *config.Config {
+	t.Helper()
+
+	cfg := &config.Config{}
+	dec := yaml.NewDecoder(strings.NewReader(c))
+	dec.KnownFields(true)
+	if err := dec.Decode(cfg); err != nil && err != io.EOF {
+		t.Fatalf("Unable to load YAML config: %v", err)
+	}
+	return cfg
 }
 
 func makeInputTargetGroup() *targetgroup.Group {
