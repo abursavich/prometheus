@@ -27,7 +27,7 @@ import (
 	"github.com/prometheus/common/model"
 	yaml "gopkg.in/yaml.v2"
 
-	sd_config "github.com/prometheus/prometheus/discovery/config"
+	"github.com/prometheus/prometheus/discovery/discoverer"
 	"github.com/prometheus/prometheus/pkg/labels"
 	"github.com/prometheus/prometheus/pkg/relabel"
 )
@@ -168,7 +168,7 @@ func resolveFilepaths(baseDir string, cfg *Config) {
 		scfg.BearerTokenFile = join(scfg.BearerTokenFile)
 		tlsPaths(&scfg.TLSConfig)
 	}
-	sdPaths := func(cfg *sd_config.ServiceDiscoveryConfig) {
+	sdPaths := func(cfg *discoverer.ServiceDiscoveryConfig) {
 		for _, kcfg := range cfg.KubernetesSDConfigs {
 			clientPaths(&kcfg.HTTPClientConfig)
 		}
@@ -388,8 +388,8 @@ type ScrapeConfig struct {
 	// We cannot do proper Go type embedding below as the parser will then parse
 	// values arbitrarily into the overflow maps of further-down types.
 
-	ServiceDiscoveryConfig sd_config.ServiceDiscoveryConfig `yaml:",inline"`
-	HTTPClientConfig       config_util.HTTPClientConfig     `yaml:",inline"`
+	ServiceDiscoveryConfig discoverer.ServiceDiscoveryConfig `yaml:",inline"`
+	HTTPClientConfig       config_util.HTTPClientConfig      `yaml:",inline"`
 
 	// List of target relabel configurations.
 	RelabelConfigs []*relabel.Config `yaml:"relabel_configs,omitempty"`
@@ -529,8 +529,8 @@ type AlertmanagerConfig struct {
 	// We cannot do proper Go type embedding below as the parser will then parse
 	// values arbitrarily into the overflow maps of further-down types.
 
-	ServiceDiscoveryConfig sd_config.ServiceDiscoveryConfig `yaml:",inline"`
-	HTTPClientConfig       config_util.HTTPClientConfig     `yaml:",inline"`
+	ServiceDiscoveryConfig discoverer.ServiceDiscoveryConfig `yaml:",inline"`
+	HTTPClientConfig       config_util.HTTPClientConfig      `yaml:",inline"`
 
 	// The URL scheme to use when talking to Alertmanagers.
 	Scheme string `yaml:"scheme,omitempty"`
