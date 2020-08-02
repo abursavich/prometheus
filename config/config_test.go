@@ -143,17 +143,19 @@ var expectedConf = &Config{
 			},
 
 			ServiceDiscoveryConfig: discoverer.ServiceDiscoveryConfig{
-				StaticConfigs: []*targetgroup.Group{
-					{
-						Targets: []model.LabelSet{
-							{model.AddressLabel: "localhost:9090"},
-							{model.AddressLabel: "localhost:9191"},
+				Configs: []discoverer.Config{
+					discoverer.StaticConfig{
+						{
+							Targets: []model.LabelSet{
+								{model.AddressLabel: "localhost:9090"},
+								{model.AddressLabel: "localhost:9191"},
+							},
+							Labels: model.LabelSet{
+								"my":   "label",
+								"your": "label",
+							},
+							Source: "0",
 						},
-						Labels: model.LabelSet{
-							"my":   "label",
-							"your": "label",
-						},
-						Source: "0",
 					},
 				},
 
@@ -529,12 +531,14 @@ var expectedConf = &Config{
 			Scheme:      DefaultScrapeConfig.Scheme,
 
 			ServiceDiscoveryConfig: discoverer.ServiceDiscoveryConfig{
-				StaticConfigs: []*targetgroup.Group{
-					{
-						Targets: []model.LabelSet{
-							{model.AddressLabel: "localhost:9090"},
+				Configs: []discoverer.Config{
+					discoverer.StaticConfig{
+						{
+							Targets: []model.LabelSet{
+								{model.AddressLabel: "localhost:9090"},
+							},
+							Source: "0",
 						},
-						Source: "0",
 					},
 				},
 			},
@@ -550,12 +554,14 @@ var expectedConf = &Config{
 			Scheme:      DefaultScrapeConfig.Scheme,
 
 			ServiceDiscoveryConfig: discoverer.ServiceDiscoveryConfig{
-				StaticConfigs: []*targetgroup.Group{
-					{
-						Targets: []model.LabelSet{
-							{model.AddressLabel: "localhost:9090"},
+				Configs: []discoverer.Config{
+					discoverer.StaticConfig{
+						{
+							Targets: []model.LabelSet{
+								{model.AddressLabel: "localhost:9090"},
+							},
+							Source: "0",
 						},
-						Source: "0",
 					},
 				},
 			},
@@ -571,12 +577,14 @@ var expectedConf = &Config{
 			Scheme:      DefaultScrapeConfig.Scheme,
 
 			ServiceDiscoveryConfig: discoverer.ServiceDiscoveryConfig{
-				StaticConfigs: []*targetgroup.Group{
-					{
-						Targets: []model.LabelSet{
-							{model.AddressLabel: "localhost:9090"},
+				Configs: []discoverer.Config{
+					discoverer.StaticConfig{
+						{
+							Targets: []model.LabelSet{
+								{model.AddressLabel: "localhost:9090"},
+							},
+							Source: "0",
 						},
-						Source: "0",
 					},
 				},
 			},
@@ -687,14 +695,16 @@ var expectedConf = &Config{
 				Timeout:    model.Duration(10 * time.Second),
 				APIVersion: AlertmanagerAPIVersionV1,
 				ServiceDiscoveryConfig: discoverer.ServiceDiscoveryConfig{
-					StaticConfigs: []*targetgroup.Group{
-						{
-							Targets: []model.LabelSet{
-								{model.AddressLabel: "1.2.3.4:9093"},
-								{model.AddressLabel: "1.2.3.5:9093"},
-								{model.AddressLabel: "1.2.3.6:9093"},
+					Configs: []discoverer.Config{
+						discoverer.StaticConfig{
+							{
+								Targets: []model.LabelSet{
+									{model.AddressLabel: "1.2.3.4:9093"},
+									{model.AddressLabel: "1.2.3.5:9093"},
+									{model.AddressLabel: "1.2.3.6:9093"},
+								},
+								Source: "0",
 							},
-							Source: "0",
 						},
 					},
 				},
@@ -831,7 +841,7 @@ var expectedErrors = []struct {
 		errMsg:   "invalid rule file path",
 	}, {
 		filename: "unknown_attr.bad.yml",
-		errMsg:   "field consult_sd_configs not found in type config.plain",
+		errMsg:   "field consult_sd_configs not found in type",
 	}, {
 		filename: "bearertoken.bad.yml",
 		errMsg:   "at most one of bearer_token & bearer_token_file must be configured",
