@@ -23,6 +23,8 @@ package discoverer
 import (
 	"context"
 
+	"github.com/go-kit/kit/log"
+
 	"github.com/prometheus/prometheus/discovery/targetgroup"
 )
 
@@ -39,4 +41,29 @@ type Discoverer interface {
 	// it can send updated target groups. It must return when the context is canceled.
 	// It should not close the update channel on returning.
 	Run(ctx context.Context, up chan<- []*targetgroup.Group)
+}
+
+// Options provides options for a Discoverer.
+type Options struct {
+	Logger log.Logger
+}
+
+// ConfigOptions provides options for a Config.
+type ConfigOptions struct {
+	// Directory may be used to resolve relative file paths
+	// in the config (e.g. TLS certificates).
+	Directory string
+}
+
+// A Config provides the configuration and constructor for a Discoverer.
+type Config interface {
+	// Name returns the name of the discovery mechanism.
+	Name() string
+
+	// NewDiscoverer returns a Discoverer for the Config
+	// with the given Options.
+	NewDiscoverer(Options) (Discoverer, error)
+
+	// SetOptions applies the ConfigOptions to the Config.
+	SetOptions(ConfigOptions)
 }
