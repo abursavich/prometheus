@@ -11,7 +11,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package config
+package config_test
+
+import . "github.com/prometheus/prometheus/config"
 
 const ruleFilesConfigFile = "testdata/rules_abs_path_windows.good.yml"
 
@@ -22,5 +24,4 @@ var ruleFilesExpectedConf = &Config{
 		"testdata\\rules\\second.rules",
 		"c:\\absolute\\third.rules",
 	},
-	original: "",
 }
