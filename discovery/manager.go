@@ -37,7 +37,6 @@ import (
 	"github.com/prometheus/prometheus/discovery/gce"
 	"github.com/prometheus/prometheus/discovery/kubernetes"
 	"github.com/prometheus/prometheus/discovery/marathon"
-	"github.com/prometheus/prometheus/discovery/openstack"
 	"github.com/prometheus/prometheus/discovery/triton"
 	"github.com/prometheus/prometheus/discovery/zookeeper"
 )
@@ -404,11 +403,6 @@ func (m *Manager) registerProviders(cfg discoverer.ServiceDiscoveryConfig, setNa
 			return ec2.NewDiscovery(c, log.With(m.logger, "discovery", "ec2")), nil
 		})
 	}
-	for _, c := range cfg.OpenstackSDConfigs {
-		add(c, func() (Discoverer, error) {
-			return openstack.NewDiscovery(c, log.With(m.logger, "discovery", "openstack"))
-		})
-	}
 	for _, c := range cfg.GCESDConfigs {
 		add(c, func() (Discoverer, error) {
 			return gce.NewDiscovery(*c, log.With(m.logger, "discovery", "gce"))
@@ -429,11 +423,6 @@ func (m *Manager) registerProviders(cfg discoverer.ServiceDiscoveryConfig, setNa
 			return c.NewDiscoverer(discoverer.Options{
 				Logger: log.With(m.logger, "discovery", c.Name()),
 			})
-		})
-	}
-	if len(cfg.StaticConfigs) > 0 {
-		add(setName, func() (Discoverer, error) {
-			return &StaticProvider{TargetGroups: cfg.StaticConfigs}, nil
 		})
 	}
 	if !added {

@@ -396,9 +396,7 @@ type ScrapeConfig struct {
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
 func (c *ScrapeConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	*c = DefaultScrapeConfig
-	type plain ScrapeConfig
-	err := unmarshal((*plain)(c))
-	if err != nil {
+	if err := unmarshalWithDiscoveryConfigs(c, unmarshal); err != nil {
 		return err
 	}
 	if len(c.JobName) == 0 {
@@ -421,12 +419,8 @@ func (c *ScrapeConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 
 	// Check for users putting URLs in target groups.
 	if len(c.RelabelConfigs) == 0 {
-		for _, tg := range c.ServiceDiscoveryConfig.StaticConfigs {
-			for _, t := range tg.Targets {
-				if err := CheckTargetAddress(t[model.AddressLabel]); err != nil {
-					return err
-				}
-			}
+		if err := checkStaticTargets(c.ServiceDiscoveryConfig.Configs); err != nil {
+			return err
 		}
 	}
 
@@ -441,13 +435,12 @@ func (c *ScrapeConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		}
 	}
 
-	// Add index to the static config target groups for unique identification
-	// within scrape pool.
-	for i, tg := range c.ServiceDiscoveryConfig.StaticConfigs {
-		tg.Source = fmt.Sprintf("%d", i)
-	}
-
 	return nil
+}
+
+// MarshalYAML implements the yaml.Marshaler interface.
+func (c *ScrapeConfig) MarshalYAML() (interface{}, error) {
+	return marshalWithDiscoveryConfigs(c)
 }
 
 // AlertingConfig configures alerting and alertmanager related configs.
@@ -545,8 +538,7 @@ type AlertmanagerConfig struct {
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
 func (c *AlertmanagerConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	*c = DefaultAlertmanagerConfig
-	type plain AlertmanagerConfig
-	if err := unmarshal((*plain)(c)); err != nil {
+	if err := unmarshalWithDiscoveryConfigs(c, unmarshal); err != nil {
 		return err
 	}
 
@@ -566,12 +558,8 @@ func (c *AlertmanagerConfig) UnmarshalYAML(unmarshal func(interface{}) error) er
 
 	// Check for users putting URLs in target groups.
 	if len(c.RelabelConfigs) == 0 {
-		for _, tg := range c.ServiceDiscoveryConfig.StaticConfigs {
-			for _, t := range tg.Targets {
-				if err := CheckTargetAddress(t[model.AddressLabel]); err != nil {
-					return err
-				}
-			}
+		if err := checkStaticTargets(c.ServiceDiscoveryConfig.Configs); err != nil {
+			return err
 		}
 	}
 
@@ -581,12 +569,28 @@ func (c *AlertmanagerConfig) UnmarshalYAML(unmarshal func(interface{}) error) er
 		}
 	}
 
-	// Add index to the static config target groups for unique identification
-	// within scrape pool.
-	for i, tg := range c.ServiceDiscoveryConfig.StaticConfigs {
-		tg.Source = fmt.Sprintf("%d", i)
-	}
+	return nil
+}
 
+// MarshalYAML implements the yaml.Marshaler interface.
+func (c *AlertmanagerConfig) MarshalYAML() (interface{}, error) {
+	return marshalWithDiscoveryConfigs(c)
+}
+
+func checkStaticTargets(configs []discoverer.Config) error {
+	for _, cfg := range configs {
+		sc, ok := cfg.(discoverer.StaticConfig)
+		if !ok {
+			continue
+		}
+		for _, tg := range sc {
+			for _, t := range tg.Targets {
+				if err := CheckTargetAddress(t[model.AddressLabel]); err != nil {
+					return err
+				}
+			}
+		}
+	}
 	return nil
 }
 
