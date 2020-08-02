@@ -13,7 +13,9 @@
 
 // +build !windows
 
-package config
+package config_test
+
+import . "github.com/prometheus/prometheus/config"
 
 const ruleFilesConfigFile = "testdata/rules_abs_path.good.yml"
 
@@ -24,5 +26,4 @@ var ruleFilesExpectedConf = &Config{
 		"testdata/rules/second.rules",
 		"/absolute/third.rules",
 	},
-	original: "",
 }
