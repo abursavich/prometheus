@@ -11,7 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package config
+package config_test
 
 import (
 	"encoding/json"
@@ -26,6 +26,8 @@ import (
 	config_util "github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
 	"gopkg.in/yaml.v2"
+
+	. "github.com/prometheus/prometheus/config"
 
 	"github.com/prometheus/prometheus/discovery/azure"
 	"github.com/prometheus/prometheus/discovery/consul"
@@ -699,7 +701,6 @@ var expectedConf = &Config{
 			},
 		},
 	},
-	original: "",
 }
 
 func TestLoadConfig(t *testing.T) {
@@ -710,8 +711,6 @@ func TestLoadConfig(t *testing.T) {
 
 	c, err := LoadFile("testdata/conf.good.yml")
 	testutil.Ok(t, err)
-
-	expectedConf.original = c.original
 	testutil.Equals(t, expectedConf, c)
 }
 
@@ -745,8 +744,6 @@ func TestLoadConfigRuleFilesAbsolutePath(t *testing.T) {
 	// Parse a valid file that sets a rule files with an absolute path
 	c, err := LoadFile(ruleFilesConfigFile)
 	testutil.Ok(t, err)
-
-	ruleFilesExpectedConf.original = c.original
 	testutil.Equals(t, ruleFilesExpectedConf, c)
 }
 
@@ -1022,7 +1019,6 @@ func TestEmptyGlobalBlock(t *testing.T) {
 	c, err := Load("global:\n")
 	testutil.Ok(t, err)
 	exp := DefaultConfig
-	exp.original = "global:\n"
 	testutil.Equals(t, exp, *c)
 }
 
