@@ -602,8 +602,8 @@ var expectedConf = &Config{
 			Scheme:      DefaultScrapeConfig.Scheme,
 
 			ServiceDiscoveryConfig: discoverer.ServiceDiscoveryConfig{
-				TritonSDConfigs: []*triton.SDConfig{
-					{
+				Configs: []discoverer.Config{
+					&triton.SDConfig{
 						Account:         "testAccount",
 						Role:            "container",
 						DNSSuffix:       "triton.example.com",
