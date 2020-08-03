@@ -140,73 +140,52 @@ type Config struct {
 
 // resolveFilepaths joins all relative paths in a configuration
 // with a given base directory.
-func resolveFilepaths(baseDir string, cfg *Config) {
-	join := func(fp string) string {
-		if len(fp) > 0 && !filepath.IsAbs(fp) {
-			fp = filepath.Join(baseDir, fp)
-		}
-		return fp
-	}
-
+func resolveFilepaths(dir string, cfg *Config) {
 	for i, rf := range cfg.RuleFiles {
-		cfg.RuleFiles[i] = join(rf)
-	}
-
-	tlsPaths := func(cfg *config_util.TLSConfig) {
-		cfg.CAFile = join(cfg.CAFile)
-		cfg.CertFile = join(cfg.CertFile)
-		cfg.KeyFile = join(cfg.KeyFile)
-	}
-	clientPaths := func(scfg *config_util.HTTPClientConfig) {
-		if scfg.BasicAuth != nil {
-			scfg.BasicAuth.PasswordFile = join(scfg.BasicAuth.PasswordFile)
-		}
-		scfg.BearerTokenFile = join(scfg.BearerTokenFile)
-		tlsPaths(&scfg.TLSConfig)
+		cfg.RuleFiles[i] = JoinDir(dir, rf)
 	}
 	sdPaths := func(cfg *discoverer.ServiceDiscoveryConfig) {
-		for _, kcfg := range cfg.KubernetesSDConfigs {
-			clientPaths(&kcfg.HTTPClientConfig)
+		for _, c := range cfg.KubernetesSDConfigs {
+			SetHTTPClientConfigDirectory(&c.HTTPClientConfig, dir)
 		}
-		for _, mcfg := range cfg.MarathonSDConfigs {
-			mcfg.AuthTokenFile = join(mcfg.AuthTokenFile)
-			clientPaths(&mcfg.HTTPClientConfig)
+		for _, c := range cfg.MarathonSDConfigs {
+			SetHTTPClientConfigDirectory(&c.HTTPClientConfig, dir)
+			c.AuthTokenFile = JoinDir(dir, c.AuthTokenFile)
 		}
-		for _, consulcfg := range cfg.ConsulSDConfigs {
-			tlsPaths(&consulcfg.TLSConfig)
+		for _, c := range cfg.ConsulSDConfigs {
+			SetTLSConfigDirectory(&c.TLSConfig, dir)
 		}
-		for _, digitaloceancfg := range cfg.DigitalOceanSDConfigs {
-			clientPaths(&digitaloceancfg.HTTPClientConfig)
+		for _, c := range cfg.DigitalOceanSDConfigs {
+			SetHTTPClientConfigDirectory(&c.HTTPClientConfig, dir)
 		}
-		for _, dockerswarmcfg := range cfg.DockerSwarmSDConfigs {
-			clientPaths(&dockerswarmcfg.HTTPClientConfig)
+		for _, c := range cfg.DockerSwarmSDConfigs {
+			SetHTTPClientConfigDirectory(&c.HTTPClientConfig, dir)
 		}
-		for _, cfg := range cfg.OpenstackSDConfigs {
-			tlsPaths(&cfg.TLSConfig)
+		for _, c := range cfg.OpenstackSDConfigs {
+			SetTLSConfigDirectory(&c.TLSConfig, dir)
 		}
-		for _, cfg := range cfg.TritonSDConfigs {
-			tlsPaths(&cfg.TLSConfig)
+		for _, c := range cfg.TritonSDConfigs {
+			SetTLSConfigDirectory(&c.TLSConfig, dir)
 		}
 		for _, filecfg := range cfg.FileSDConfigs {
 			for i, fn := range filecfg.Files {
-				filecfg.Files[i] = join(fn)
+				filecfg.Files[i] = JoinDir(dir, fn)
 			}
 		}
 	}
-
-	for _, cfg := range cfg.ScrapeConfigs {
-		clientPaths(&cfg.HTTPClientConfig)
-		sdPaths(&cfg.ServiceDiscoveryConfig)
+	for _, c := range cfg.ScrapeConfigs {
+		SetHTTPClientConfigDirectory(&c.HTTPClientConfig, dir)
+		sdPaths(&c.ServiceDiscoveryConfig)
 	}
-	for _, cfg := range cfg.AlertingConfig.AlertmanagerConfigs {
-		clientPaths(&cfg.HTTPClientConfig)
-		sdPaths(&cfg.ServiceDiscoveryConfig)
+	for _, c := range cfg.AlertingConfig.AlertmanagerConfigs {
+		SetHTTPClientConfigDirectory(&c.HTTPClientConfig, dir)
+		sdPaths(&c.ServiceDiscoveryConfig)
 	}
-	for _, cfg := range cfg.RemoteReadConfigs {
-		clientPaths(&cfg.HTTPClientConfig)
+	for _, c := range cfg.RemoteReadConfigs {
+		SetHTTPClientConfigDirectory(&c.HTTPClientConfig, dir)
 	}
-	for _, cfg := range cfg.RemoteWriteConfigs {
-		clientPaths(&cfg.HTTPClientConfig)
+	for _, c := range cfg.RemoteWriteConfigs {
+		SetHTTPClientConfigDirectory(&c.HTTPClientConfig, dir)
 	}
 }
 
