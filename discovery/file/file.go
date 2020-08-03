@@ -33,6 +33,8 @@ import (
 	fsnotify "gopkg.in/fsnotify/fsnotify.v1"
 	yaml "gopkg.in/yaml.v2"
 
+	"github.com/prometheus/prometheus/config"
+	"github.com/prometheus/prometheus/discovery/discoverer"
 	"github.com/prometheus/prometheus/discovery/targetgroup"
 )
 
@@ -45,11 +47,33 @@ var (
 	}
 )
 
+func init() {
+	config.RegisterServiceDiscovery(&SDConfig{})
+}
+
 // SDConfig is the configuration for file based discovery.
 type SDConfig struct {
 	Files           []string       `yaml:"files"`
 	RefreshInterval model.Duration `yaml:"refresh_interval,omitempty"`
 }
+
+// Name returns the name of the Config.
+func (*SDConfig) Name() string { return "file" }
+
+// NewDiscoverer returns a Discoverer for the Config.
+func (c *SDConfig) NewDiscoverer(opts discoverer.Options) (discoverer.Discoverer, error) {
+	return NewDiscovery(c, opts.Logger), nil
+}
+
+// SetOptions applies the options to the Config.
+func (c *SDConfig) SetOptions(opts discoverer.ConfigOptions) {
+	for i, file := range c.Files {
+		c.Files[i] = config.JoinDir(opts.Directory, file)
+	}
+}
+
+// Validate checks the Config for errors.
+func (*SDConfig) Validate() error { return nil }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
 func (c *SDConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
