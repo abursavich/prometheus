@@ -36,20 +36,20 @@ var (
 	svcDeleteCount = eventCount.WithLabelValues("service", "delete")
 )
 
-// Service implements discovery of Kubernetes services.
-type Service struct {
+// serviceDiscoverer implements discovery of Kubernetes services.
+type serviceDiscoverer struct {
 	logger   log.Logger
 	informer cache.SharedInformer
 	store    cache.Store
 	queue    *workqueue.Type
 }
 
-// NewService returns a new service discovery.
-func NewService(l log.Logger, inf cache.SharedInformer) *Service {
+// newServiceDiscoverer returns a new service discovery.
+func newServiceDiscoverer(l log.Logger, inf cache.SharedInformer) *serviceDiscoverer {
 	if l == nil {
 		l = log.NewNopLogger()
 	}
-	s := &Service{logger: l, informer: inf, store: inf.GetStore(), queue: workqueue.NewNamed("service")}
+	s := &serviceDiscoverer{logger: l, informer: inf, store: inf.GetStore(), queue: workqueue.NewNamed("service")}
 	s.informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(o interface{}) {
 			svcAddCount.Inc()
@@ -67,7 +67,7 @@ func NewService(l log.Logger, inf cache.SharedInformer) *Service {
 	return s
 }
 
-func (s *Service) enqueue(obj interface{}) {
+func (s *serviceDiscoverer) enqueue(obj interface{}) {
 	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 	if err != nil {
 		return
@@ -77,7 +77,7 @@ func (s *Service) enqueue(obj interface{}) {
 }
 
 // Run implements the Discoverer interface.
-func (s *Service) Run(ctx context.Context, ch chan<- []*targetgroup.Group) {
+func (s *serviceDiscoverer) Run(ctx context.Context, ch chan<- []*targetgroup.Group) {
 	defer s.queue.ShutDown()
 
 	if !cache.WaitForCacheSync(ctx.Done(), s.informer.HasSynced) {
@@ -96,7 +96,7 @@ func (s *Service) Run(ctx context.Context, ch chan<- []*targetgroup.Group) {
 	<-ctx.Done()
 }
 
-func (s *Service) process(ctx context.Context, ch chan<- []*targetgroup.Group) bool {
+func (s *serviceDiscoverer) process(ctx context.Context, ch chan<- []*targetgroup.Group) bool {
 	keyObj, quit := s.queue.Get()
 	if quit {
 		return false
@@ -176,7 +176,7 @@ func serviceLabels(svc *apiv1.Service) model.LabelSet {
 	return ls
 }
 
-func (s *Service) buildService(svc *apiv1.Service) *targetgroup.Group {
+func (s *serviceDiscoverer) buildService(svc *apiv1.Service) *targetgroup.Group {
 	tg := &targetgroup.Group{
 		Source: serviceSource(svc),
 	}

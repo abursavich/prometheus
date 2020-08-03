@@ -120,7 +120,7 @@ func (*Config) Name() string { return "kubernetes" }
 
 // NewDiscoverer returns a Discoverer for the Config.
 func (c *Config) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
-	return New(opts.Logger, c)
+	return newDiscoverer(opts.Logger, c)
 }
 
 // SetOptions applies the options to the Config.
@@ -226,9 +226,9 @@ func (c *NamespaceDiscovery) UnmarshalYAML(unmarshal func(interface{}) error) er
 	return unmarshal((*plain)(c))
 }
 
-// Discovery implements the discoverer interface for discovering
+// discoverer implements the discoverer interface for discovering
 // targets from Kubernetes.
-type Discovery struct {
+type discoverer struct {
 	sync.RWMutex
 	client             kubernetes.Interface
 	role               Role
@@ -238,7 +238,7 @@ type Discovery struct {
 	selectors          roleSelector
 }
 
-func (d *Discovery) getNamespaces() []string {
+func (d *discoverer) getNamespaces() []string {
 	namespaces := d.namespaceDiscovery.Names
 	if len(namespaces) == 0 {
 		namespaces = []string{apiv1.NamespaceAll}
@@ -246,8 +246,8 @@ func (d *Discovery) getNamespaces() []string {
 	return namespaces
 }
 
-// New creates a new Kubernetes discovery for the given role.
-func New(l log.Logger, conf *Config) (*Discovery, error) {
+// newDiscoverer creates a new Kubernetes discovery for the given role.
+func newDiscoverer(l log.Logger, conf *Config) (*discoverer, error) {
 	if l == nil {
 		l = log.NewNopLogger()
 	}
@@ -280,7 +280,7 @@ func New(l log.Logger, conf *Config) (*Discovery, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Discovery{
+	return &discoverer{
 		client:             c,
 		logger:             l,
 		role:               conf.Role,
@@ -317,7 +317,7 @@ func mapSelector(rawSelector []SelectorConfig) roleSelector {
 const resyncPeriod = 10 * time.Minute
 
 // Run implements the discoverer interface.
-func (d *Discovery) Run(ctx context.Context, ch chan<- []*targetgroup.Group) {
+func (d *discoverer) Run(ctx context.Context, ch chan<- []*targetgroup.Group) {
 	d.Lock()
 	namespaces := d.getNamespaces()
 
@@ -389,7 +389,7 @@ func (d *Discovery) Run(ctx context.Context, ch chan<- []*targetgroup.Group) {
 					return p.Watch(ctx, options)
 				},
 			}
-			pod := NewPod(
+			pod := podPodDiscoverer(
 				log.With(d.logger, "role", "pod"),
 				cache.NewSharedInformer(plw, &apiv1.Pod{}, resyncPeriod),
 			)
@@ -411,7 +411,7 @@ func (d *Discovery) Run(ctx context.Context, ch chan<- []*targetgroup.Group) {
 					return s.Watch(ctx, options)
 				},
 			}
-			svc := NewService(
+			svc := newServiceDiscoverer(
 				log.With(d.logger, "role", "service"),
 				cache.NewSharedInformer(slw, &apiv1.Service{}, resyncPeriod),
 			)
@@ -433,7 +433,7 @@ func (d *Discovery) Run(ctx context.Context, ch chan<- []*targetgroup.Group) {
 					return i.Watch(ctx, options)
 				},
 			}
-			ingress := NewIngress(
+			ingress := newIngressDiscoverer(
 				log.With(d.logger, "role", "ingress"),
 				cache.NewSharedInformer(ilw, &v1beta1.Ingress{}, resyncPeriod),
 			)
@@ -453,7 +453,7 @@ func (d *Discovery) Run(ctx context.Context, ch chan<- []*targetgroup.Group) {
 				return d.client.CoreV1().Nodes().Watch(ctx, options)
 			},
 		}
-		node := NewNode(
+		node := newNodeDiscoverer(
 			log.With(d.logger, "role", "node"),
 			cache.NewSharedInformer(nlw, &apiv1.Node{}, resyncPeriod),
 		)

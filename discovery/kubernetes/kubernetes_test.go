@@ -35,10 +35,10 @@ func TestMain(m *testing.M) {
 }
 
 // makeDiscovery creates a kubernetes.Discovery instance for testing.
-func makeDiscovery(role Role, nsDiscovery NamespaceDiscovery, objects ...runtime.Object) (*Discovery, kubernetes.Interface) {
+func makeDiscovery(role Role, nsDiscovery NamespaceDiscovery, objects ...runtime.Object) (*discoverer, kubernetes.Interface) {
 	clientset := fake.NewSimpleClientset(objects...)
 
-	return &Discovery{
+	return &discoverer{
 		client:             clientset,
 		logger:             log.NewNopLogger(),
 		role:               role,
@@ -76,7 +76,7 @@ func (d k8sDiscoveryTest) Run(t *testing.T) {
 	// condition where the above go routine may or may not have set a
 	// discoverer yet.
 	for {
-		dis := d.discovery.(*Discovery)
+		dis := d.discovery.(*discoverer)
 		dis.RLock()
 		l := len(dis.discoverers)
 		dis.RUnlock()
@@ -160,14 +160,14 @@ type hasSynced interface {
 	hasSynced() bool
 }
 
-var _ hasSynced = &Discovery{}
-var _ hasSynced = &Node{}
+var _ hasSynced = &discoverer{}
+var _ hasSynced = &nodeDiscoverer{}
 var _ hasSynced = &Endpoints{}
-var _ hasSynced = &Ingress{}
-var _ hasSynced = &Pod{}
-var _ hasSynced = &Service{}
+var _ hasSynced = &ingressDiscoverer{}
+var _ hasSynced = &podDiscoverer{}
+var _ hasSynced = &serviceDiscoverer{}
 
-func (d *Discovery) hasSynced() bool {
+func (d *discoverer) hasSynced() bool {
 	d.RLock()
 	defer d.RUnlock()
 	for _, discoverer := range d.discoverers {
@@ -180,7 +180,7 @@ func (d *Discovery) hasSynced() bool {
 	return true
 }
 
-func (n *Node) hasSynced() bool {
+func (n *nodeDiscoverer) hasSynced() bool {
 	return n.informer.HasSynced()
 }
 
@@ -188,14 +188,14 @@ func (e *Endpoints) hasSynced() bool {
 	return e.endpointsInf.HasSynced() && e.serviceInf.HasSynced() && e.podInf.HasSynced()
 }
 
-func (i *Ingress) hasSynced() bool {
+func (i *ingressDiscoverer) hasSynced() bool {
 	return i.informer.HasSynced()
 }
 
-func (p *Pod) hasSynced() bool {
+func (p *podDiscoverer) hasSynced() bool {
 	return p.informer.HasSynced()
 }
 
-func (s *Service) hasSynced() bool {
+func (s *serviceDiscoverer) hasSynced() bool {
 	return s.informer.HasSynced()
 }

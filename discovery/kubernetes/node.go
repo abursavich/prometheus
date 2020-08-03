@@ -40,20 +40,20 @@ var (
 	nodeDeleteCount = eventCount.WithLabelValues("node", "delete")
 )
 
-// Node discovers Kubernetes nodes.
-type Node struct {
+// nodeDiscoverer discovers Kubernetes nodes.
+type nodeDiscoverer struct {
 	logger   log.Logger
 	informer cache.SharedInformer
 	store    cache.Store
 	queue    *workqueue.Type
 }
 
-// NewNode returns a new node discovery.
-func NewNode(l log.Logger, inf cache.SharedInformer) *Node {
+// newNodeDiscoverer returns a new node discovery.
+func newNodeDiscoverer(l log.Logger, inf cache.SharedInformer) *nodeDiscoverer {
 	if l == nil {
 		l = log.NewNopLogger()
 	}
-	n := &Node{logger: l, informer: inf, store: inf.GetStore(), queue: workqueue.NewNamed("node")}
+	n := &nodeDiscoverer{logger: l, informer: inf, store: inf.GetStore(), queue: workqueue.NewNamed("node")}
 	n.informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(o interface{}) {
 			nodeAddCount.Inc()
@@ -71,7 +71,7 @@ func NewNode(l log.Logger, inf cache.SharedInformer) *Node {
 	return n
 }
 
-func (n *Node) enqueue(obj interface{}) {
+func (n *nodeDiscoverer) enqueue(obj interface{}) {
 	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 	if err != nil {
 		return
@@ -81,7 +81,7 @@ func (n *Node) enqueue(obj interface{}) {
 }
 
 // Run implements the Discoverer interface.
-func (n *Node) Run(ctx context.Context, ch chan<- []*targetgroup.Group) {
+func (n *nodeDiscoverer) Run(ctx context.Context, ch chan<- []*targetgroup.Group) {
 	defer n.queue.ShutDown()
 
 	if !cache.WaitForCacheSync(ctx.Done(), n.informer.HasSynced) {
@@ -100,7 +100,7 @@ func (n *Node) Run(ctx context.Context, ch chan<- []*targetgroup.Group) {
 	<-ctx.Done()
 }
 
-func (n *Node) process(ctx context.Context, ch chan<- []*targetgroup.Group) bool {
+func (n *nodeDiscoverer) process(ctx context.Context, ch chan<- []*targetgroup.Group) bool {
 	keyObj, quit := n.queue.Get()
 	if quit {
 		return false
@@ -176,7 +176,7 @@ func nodeLabels(n *apiv1.Node) model.LabelSet {
 	return ls
 }
 
-func (n *Node) buildNode(node *apiv1.Node) *targetgroup.Group {
+func (n *nodeDiscoverer) buildNode(node *apiv1.Node) *targetgroup.Group {
 	tg := &targetgroup.Group{
 		Source: nodeSource(node),
 	}
