@@ -30,6 +30,8 @@ import (
 	config_util "github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
 
+	"github.com/prometheus/prometheus/config"
+	"github.com/prometheus/prometheus/discovery/discoverer"
 	"github.com/prometheus/prometheus/discovery/refresh"
 	"github.com/prometheus/prometheus/discovery/targetgroup"
 )
@@ -52,6 +54,10 @@ var DefaultSDConfig = SDConfig{
 	Version:         1,
 }
 
+func init() {
+	config.RegisterServiceDiscovery(&SDConfig{})
+}
+
 // SDConfig is the configuration for Triton based service discovery.
 type SDConfig struct {
 	Account         string                `yaml:"account"`
@@ -63,6 +69,19 @@ type SDConfig struct {
 	RefreshInterval model.Duration        `yaml:"refresh_interval,omitempty"`
 	TLSConfig       config_util.TLSConfig `yaml:"tls_config,omitempty"`
 	Version         int                   `yaml:"version"`
+}
+
+// Name returns the name of the Config.
+func (*SDConfig) Name() string { return "triton" }
+
+// NewDiscoverer returns a Discoverer for the Config.
+func (c *SDConfig) NewDiscoverer(opts discoverer.Options) (discoverer.Discoverer, error) {
+	return New(opts.Logger, c)
+}
+
+// SetOptions applies the options to the Config.
+func (c *SDConfig) SetOptions(opts discoverer.ConfigOptions) {
+	config.SetTLSConfigDirectory(&c.TLSConfig, opts.Directory)
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
