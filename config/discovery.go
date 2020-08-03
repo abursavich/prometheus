@@ -39,8 +39,8 @@ var (
 	configFields     []reflect.StructField
 	configTypes      sync.Map // map[reflect.Type]reflect.Type
 
-	emptyStructType            = reflect.TypeOf(struct{}{})
-	serviceDiscoveryConfigType = reflect.TypeOf(discoverer.ServiceDiscoveryConfig{})
+	emptyStructType = reflect.TypeOf(struct{}{})
+	configSliceType = reflect.TypeOf([]discoverer.Config{})
 )
 
 // RegisterServiceDiscovery registers the given Config type along with the YAML key for the
@@ -87,7 +87,7 @@ func getConfigType(out reflect.Type) reflect.Type {
 	var fields []reflect.StructField
 	for i := 0; i < out.NumField(); i++ {
 		switch field := out.Field(i); {
-		case field.PkgPath == "": // TODO(abursavich): && field.Type != configSliceType:
+		case field.PkgPath == "" && field.Type != configSliceType:
 			fields = append(fields, field)
 		default:
 			fields = append(fields, reflect.StructField{
@@ -121,11 +121,12 @@ func unmarshalWithDiscoveryConfigs(out interface{}, unmarshal func(interface{}) 
 	// copy shared fields (defaults) to dynamic value
 	var configs *[]discoverer.Config
 	for i := 0; i < outVal.NumField(); i++ {
+		if outTyp.Field(i).Type == configSliceType {
+			configs = outVal.Field(i).Addr().Interface().(*[]discoverer.Config)
+			continue
+		}
 		if cfgTyp.Field(i).PkgPath != "" {
 			continue // field is unexported: ignore
-		}
-		if outTyp.Field(i).Type == serviceDiscoveryConfigType { // TODO(abursavich): change to configSliceType
-			configs = &outVal.Field(i).Addr().Interface().(*discoverer.ServiceDiscoveryConfig).Configs
 		}
 		cfgVal.Field(i).Set(outVal.Field(i))
 	}
@@ -195,11 +196,11 @@ func marshalWithDiscoveryConfigs(cfg interface{}) (interface{}, error) {
 	// copy shared fields to dynamic value
 	var configs *[]discoverer.Config
 	for i := 0; i < cfgVal.NumField(); i++ {
+		if cfgTyp.Field(i).Type == configSliceType {
+			configs = cfgVal.Field(i).Addr().Interface().(*[]discoverer.Config)
+		}
 		if outTyp.Field(i).PkgPath != "" {
 			continue // field is unexported: ignore
-		}
-		if cfgTyp.Field(i).Type == serviceDiscoveryConfigType { // TODO(abursavich): change to configSliceType
-			configs = &cfgVal.Field(i).Addr().Interface().(*discoverer.ServiceDiscoveryConfig).Configs
 		}
 		outVal.Field(i).Set(cfgVal.Field(i))
 	}
