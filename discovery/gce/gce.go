@@ -16,12 +16,10 @@ package gce
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/go-kit/kit/log"
 	"github.com/pkg/errors"
 	"github.com/prometheus/common/model"
 	"golang.org/x/oauth2/google"
@@ -36,6 +34,7 @@ import (
 )
 
 const (
+	gceName                = "gce"
 	gceLabel               = model.MetaLabelPrefix + "gce_"
 	gceLabelProject        = gceLabel + "project"
 	gceLabelZone           = gceLabel + "zone"
@@ -83,11 +82,15 @@ type Config struct {
 }
 
 // Name returns the name of the Config.
-func (*Config) Name() string { return "gce" }
+func (*Config) Name() string { return gceName }
 
 // NewDiscoverer returns a Discoverer for the Config.
 func (c *Config) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
-	return NewDiscovery(*c, opts.Logger)
+	r, err := newRefresher(c)
+	if err != nil {
+		return nil, err
+	}
+	return refresh.NewDiscoverer(opts.Logger, time.Duration(c.RefreshInterval), r), nil
 }
 
 // SetOptions applies the options to the Config.
@@ -113,57 +116,44 @@ func (c *Config) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return nil
 }
 
-// Discovery periodically performs GCE-SD requests. It implements
-// the Discoverer interface.
-type Discovery struct {
-	discovery.Discoverer
+type refresher struct {
+	isvc         *compute.InstancesService
 	project      string
 	zone         string
 	filter       string
-	client       *http.Client
-	svc          *compute.Service
-	isvc         *compute.InstancesService
 	port         int
 	tagSeparator string
 }
 
-// NewDiscovery returns a new Discovery which periodically refreshes its targets.
-func NewDiscovery(conf Config, logger log.Logger) (*Discovery, error) {
-	d := &Discovery{
+func newRefresher(conf *Config) (*refresher, error) {
+	client, err := google.DefaultClient(context.Background(), compute.ComputeReadonlyScope)
+	if err != nil {
+		return nil, errors.Wrap(err, "error setting up communication with GCE service")
+	}
+	svc, err := compute.NewService(context.Background(), option.WithHTTPClient(client))
+	if err != nil {
+		return nil, errors.Wrap(err, "error setting up communication with GCE service")
+	}
+	return &refresher{
+		isvc:         compute.NewInstancesService(svc),
 		project:      conf.Project,
 		zone:         conf.Zone,
 		filter:       conf.Filter,
 		port:         conf.Port,
 		tagSeparator: conf.TagSeparator,
-	}
-	var err error
-	d.client, err = google.DefaultClient(context.Background(), compute.ComputeReadonlyScope)
-	if err != nil {
-		return nil, errors.Wrap(err, "error setting up communication with GCE service")
-	}
-	d.svc, err = compute.NewService(context.Background(), option.WithHTTPClient(d.client))
-	if err != nil {
-		return nil, errors.Wrap(err, "error setting up communication with GCE service")
-	}
-	d.isvc = compute.NewInstancesService(d.svc)
-
-	d.Discoverer = refresh.NewDiscovery(
-		logger,
-		"gce",
-		time.Duration(conf.RefreshInterval),
-		d.refresh,
-	)
-	return d, nil
+	}, nil
 }
 
-func (d *Discovery) refresh(ctx context.Context) ([]*targetgroup.Group, error) {
+func (*refresher) Name() string { return gceName }
+
+func (r *refresher) Refresh(ctx context.Context) ([]*targetgroup.Group, error) {
 	tg := &targetgroup.Group{
-		Source: fmt.Sprintf("GCE_%s_%s", d.project, d.zone),
+		Source: fmt.Sprintf("GCE_%s_%s", r.project, r.zone),
 	}
 
-	ilc := d.isvc.List(d.project, d.zone)
-	if len(d.filter) > 0 {
-		ilc = ilc.Filter(d.filter)
+	ilc := r.isvc.List(r.project, r.zone)
+	if len(r.filter) > 0 {
+		ilc = ilc.Filter(r.filter)
 	}
 	err := ilc.Pages(ctx, func(l *compute.InstanceList) error {
 		for _, inst := range l.Items {
@@ -171,7 +161,7 @@ func (d *Discovery) refresh(ctx context.Context) ([]*targetgroup.Group, error) {
 				continue
 			}
 			labels := model.LabelSet{
-				gceLabelProject:        model.LabelValue(d.project),
+				gceLabelProject:        model.LabelValue(r.project),
 				gceLabelZone:           model.LabelValue(inst.Zone),
 				gceLabelInstanceID:     model.LabelValue(strconv.FormatUint(inst.Id, 10)),
 				gceLabelInstanceName:   model.LabelValue(inst.Name),
@@ -182,14 +172,14 @@ func (d *Discovery) refresh(ctx context.Context) ([]*targetgroup.Group, error) {
 			labels[gceLabelNetwork] = model.LabelValue(priIface.Network)
 			labels[gceLabelSubnetwork] = model.LabelValue(priIface.Subnetwork)
 			labels[gceLabelPrivateIP] = model.LabelValue(priIface.NetworkIP)
-			addr := fmt.Sprintf("%s:%d", priIface.NetworkIP, d.port)
+			addr := fmt.Sprintf("%s:%d", priIface.NetworkIP, r.port)
 			labels[model.AddressLabel] = model.LabelValue(addr)
 
 			// Tags in GCE are usually only used for networking rules.
 			if inst.Tags != nil && len(inst.Tags.Items) > 0 {
 				// We surround the separated list with the separator as well. This way regular expressions
 				// in relabeling rules don't have to consider tag positions.
-				tags := d.tagSeparator + strings.Join(inst.Tags.Items, d.tagSeparator) + d.tagSeparator
+				tags := r.tagSeparator + strings.Join(inst.Tags.Items, r.tagSeparator) + r.tagSeparator
 				labels[gceLabelTags] = model.LabelValue(tags)
 			}
 
