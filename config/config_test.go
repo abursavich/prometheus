@@ -513,8 +513,8 @@ var expectedConf = &Config{
 			Scheme:      DefaultScrapeConfig.Scheme,
 
 			ServiceDiscoveryConfig: discoverer.ServiceDiscoveryConfig{
-				NerveSDConfigs: []*zookeeper.NerveSDConfig{
-					{
+				Configs: []discoverer.Config{
+					&zookeeper.NerveSDConfig{
 						Servers: []string{"localhost"},
 						Paths:   []string{"/monitoring"},
 						Timeout: model.Duration(10 * time.Second),
