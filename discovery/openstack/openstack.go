@@ -14,7 +14,6 @@
 package openstack
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -30,8 +29,9 @@ import (
 	"github.com/prometheus/prometheus/config"
 	"github.com/prometheus/prometheus/discovery"
 	"github.com/prometheus/prometheus/discovery/refresh"
-	"github.com/prometheus/prometheus/discovery/targetgroup"
 )
+
+const openstackName = "openstack"
 
 // DefaultConfig is the default OpenStack SD configuration.
 var DefaultConfig = Config{
@@ -67,11 +67,15 @@ type Config struct {
 }
 
 // Name returns the name of the Config.
-func (*Config) Name() string { return "openstack" }
+func (*Config) Name() string { return openstackName }
 
 // NewDiscoverer returns a Discoverer for the Config.
 func (c *Config) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
-	return NewDiscovery(c, opts.Logger)
+	r, err := newRefresher(c, opts.Logger)
+	if err != nil {
+		return nil, err
+	}
+	return refresh.NewDiscoverer(opts.Logger, time.Duration(c.RefreshInterval), r), nil
 }
 
 // SetOptions applies the options to the Config.
@@ -135,26 +139,10 @@ func (c *Config) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return nil
 }
 
-type refresher interface {
-	refresh(context.Context) ([]*targetgroup.Group, error)
-}
-
-// NewDiscovery returns a new OpenStack Discoverer which periodically refreshes its targets.
-func NewDiscovery(conf *Config, l log.Logger) (discovery.Discoverer, error) {
-	r, err := newRefresher(conf, l)
-	if err != nil {
-		return nil, err
+func newRefresher(conf *Config, l log.Logger) (refresh.Refresher, error) {
+	if l == nil {
+		l = log.NewNopLogger()
 	}
-	return refresh.NewDiscovery(
-		l,
-		"openstack",
-		time.Duration(conf.RefreshInterval),
-		r.refresh,
-	), nil
-
-}
-
-func newRefresher(conf *Config, l log.Logger) (refresher, error) {
 	var opts gophercloud.AuthOptions
 	if conf.IdentityEndpoint == "" {
 		var err error
@@ -199,9 +187,25 @@ func newRefresher(conf *Config, l log.Logger) (refresher, error) {
 	availability := gophercloud.Availability(conf.Availability)
 	switch conf.Role {
 	case OpenStackRoleHypervisor:
-		return newHypervisorDiscovery(client, &opts, conf.Port, conf.Region, availability, l), nil
+		return &hypervisorRefresher{
+			provider:     client,
+			authOpts:     &opts,
+			region:       conf.Region,
+			port:         conf.Port,
+			availability: availability,
+			logger:       l,
+		}, nil
 	case OpenStackRoleInstance:
-		return newInstanceDiscovery(client, &opts, conf.Port, conf.Region, conf.AllTenants, availability, l), nil
+		return &instanceRefresher{
+			provider:     client,
+			authOpts:     &opts,
+			region:       conf.Region,
+			port:         conf.Port,
+			allTenants:   conf.AllTenants,
+			availability: availability,
+			logger:       l,
+		}, nil
+	default:
+		return nil, errors.New("unknown OpenStack discovery role")
 	}
-	return nil, errors.New("unknown OpenStack discovery role")
 }

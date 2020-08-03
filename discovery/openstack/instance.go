@@ -45,8 +45,8 @@ const (
 	openstackLabelUserID         = openstackLabelPrefix + "user_id"
 )
 
-// InstanceDiscovery discovers OpenStack instances.
-type InstanceDiscovery struct {
+// instanceRefresher discovers OpenStack instances.
+type instanceRefresher struct {
 	provider     *gophercloud.ProviderClient
 	authOpts     *gophercloud.AuthOptions
 	region       string
@@ -56,22 +56,14 @@ type InstanceDiscovery struct {
 	availability gophercloud.Availability
 }
 
-// NewInstanceDiscovery returns a new instance discovery.
-func newInstanceDiscovery(provider *gophercloud.ProviderClient, opts *gophercloud.AuthOptions,
-	port int, region string, allTenants bool, availability gophercloud.Availability, l log.Logger) *InstanceDiscovery {
-	if l == nil {
-		l = log.NewNopLogger()
-	}
-	return &InstanceDiscovery{provider: provider, authOpts: opts,
-		region: region, port: port, allTenants: allTenants, availability: availability, logger: l}
-}
-
 type floatingIPKey struct {
 	id    string
 	fixed string
 }
 
-func (i *InstanceDiscovery) refresh(ctx context.Context) ([]*targetgroup.Group, error) {
+func (*instanceRefresher) Name() string { return openstackName }
+
+func (i *instanceRefresher) Refresh(ctx context.Context) ([]*targetgroup.Group, error) {
 	i.provider.Context = ctx
 	err := openstack.Authenticate(i.provider, *i.authOpts)
 	if err != nil {

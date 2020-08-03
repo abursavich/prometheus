@@ -38,8 +38,8 @@ const (
 	openstackLabelHypervisorType     = openstackLabelPrefix + "hypervisor_type"
 )
 
-// HypervisorDiscovery discovers OpenStack hypervisors.
-type HypervisorDiscovery struct {
+// hypervisorRefresher discovers OpenStack hypervisors.
+type hypervisorRefresher struct {
 	provider     *gophercloud.ProviderClient
 	authOpts     *gophercloud.AuthOptions
 	region       string
@@ -48,14 +48,9 @@ type HypervisorDiscovery struct {
 	availability gophercloud.Availability
 }
 
-// newHypervisorDiscovery returns a new hypervisor discovery.
-func newHypervisorDiscovery(provider *gophercloud.ProviderClient, opts *gophercloud.AuthOptions,
-	port int, region string, availability gophercloud.Availability, l log.Logger) *HypervisorDiscovery {
-	return &HypervisorDiscovery{provider: provider, authOpts: opts,
-		region: region, port: port, availability: availability, logger: l}
-}
+func (*hypervisorRefresher) Name() string { return openstackName }
 
-func (h *HypervisorDiscovery) refresh(ctx context.Context) ([]*targetgroup.Group, error) {
+func (h *hypervisorRefresher) Refresh(ctx context.Context) ([]*targetgroup.Group, error) {
 	h.provider.Context = ctx
 	err := openstack.Authenticate(h.provider, *h.authOpts)
 	if err != nil {
