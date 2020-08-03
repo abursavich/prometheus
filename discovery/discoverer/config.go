@@ -19,15 +19,12 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/prometheus/prometheus/discovery/file"
-	"github.com/prometheus/prometheus/discovery/kubernetes"
 )
 
 // ServiceDiscoveryConfig configures lists of different service discovery mechanisms.
 type ServiceDiscoveryConfig struct {
 	// List of file service discovery configurations.
 	FileSDConfigs []*file.SDConfig `yaml:"file_sd_configs,omitempty"`
-	// List of Kubernetes service discovery configurations.
-	KubernetesSDConfigs []*kubernetes.SDConfig `yaml:"kubernetes_sd_configs,omitempty"`
 
 	// List of additional service discovery configurations.
 	Configs []Config `yaml:"-"`
@@ -38,11 +35,6 @@ func (c *ServiceDiscoveryConfig) Validate() error {
 	for _, cfg := range c.FileSDConfigs {
 		if cfg == nil {
 			return errors.New("empty or null section in file_sd_configs")
-		}
-	}
-	for _, cfg := range c.KubernetesSDConfigs {
-		if cfg == nil {
-			return errors.New("empty or null section in kubernetes_sd_configs")
 		}
 	}
 	return nil

@@ -146,9 +146,6 @@ func resolveFilepaths(dir string, cfg *Config) {
 		cfg.RuleFiles[i] = JoinDir(dir, rf)
 	}
 	sdPaths := func(cfg *discoverer.ServiceDiscoveryConfig) {
-		for _, c := range cfg.KubernetesSDConfigs {
-			SetHTTPClientConfigDirectory(&c.HTTPClientConfig, dir)
-		}
 		for _, filecfg := range cfg.FileSDConfigs {
 			for i, fn := range filecfg.Files {
 				filecfg.Files[i] = JoinDir(dir, fn)
