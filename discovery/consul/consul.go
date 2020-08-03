@@ -31,6 +31,8 @@ import (
 	config_util "github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
 
+	"github.com/prometheus/prometheus/config"
+	"github.com/prometheus/prometheus/discovery/discoverer"
 	"github.com/prometheus/prometheus/discovery/targetgroup"
 	"github.com/prometheus/prometheus/util/strutil"
 )
@@ -99,6 +101,12 @@ var (
 	}
 )
 
+func init() {
+	discoverer.RegisterConfig(&SDConfig{})
+	prometheus.MustRegister(rpcFailuresCount)
+	prometheus.MustRegister(rpcDuration)
+}
+
 // SDConfig is the configuration for Consul service discovery.
 type SDConfig struct {
 	Server       string             `yaml:"server,omitempty"`
@@ -130,6 +138,19 @@ type SDConfig struct {
 	TLSConfig config_util.TLSConfig `yaml:"tls_config,omitempty"`
 }
 
+// Name returns the name of the Config.
+func (*SDConfig) Name() string { return "consul" }
+
+// NewDiscoverer returns a Discoverer for the Config.
+func (c *SDConfig) NewDiscoverer(opts discoverer.Options) (discoverer.Discoverer, error) {
+	return NewDiscovery(c, opts.Logger)
+}
+
+// SetOptions applies the options to the Config.
+func (c *SDConfig) SetOptions(opts discoverer.ConfigOptions) {
+	config.SetTLSConfigDirectory(&c.TLSConfig, opts.Directory)
+}
+
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
 func (c *SDConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	*c = DefaultSDConfig
@@ -142,11 +163,6 @@ func (c *SDConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		return errors.New("consul SD configuration requires a server address")
 	}
 	return nil
-}
-
-func init() {
-	prometheus.MustRegister(rpcFailuresCount)
-	prometheus.MustRegister(rpcDuration)
 }
 
 // Discovery retrieves target information from a Consul server
