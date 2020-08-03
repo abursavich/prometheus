@@ -40,6 +40,9 @@ import (
 
 	"github.com/prometheus/prometheus/config"
 	"github.com/prometheus/prometheus/pkg/rulefmt"
+
+	// register service discovery implementations
+	_ "github.com/prometheus/prometheus/discovery/install"
 )
 
 func main() {

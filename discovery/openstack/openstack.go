@@ -27,6 +27,8 @@ import (
 	config_util "github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
 
+	"github.com/prometheus/prometheus/config"
+	"github.com/prometheus/prometheus/discovery/discoverer"
 	"github.com/prometheus/prometheus/discovery/refresh"
 	"github.com/prometheus/prometheus/discovery/targetgroup"
 )
@@ -36,6 +38,10 @@ var DefaultSDConfig = SDConfig{
 	Port:            80,
 	RefreshInterval: model.Duration(60 * time.Second),
 	Availability:    "public",
+}
+
+func init() {
+	config.RegisterServiceDiscovery(&SDConfig{})
 }
 
 // SDConfig is the configuration for OpenStack based service discovery.
@@ -58,6 +64,24 @@ type SDConfig struct {
 	AllTenants                  bool                  `yaml:"all_tenants,omitempty"`
 	TLSConfig                   config_util.TLSConfig `yaml:"tls_config,omitempty"`
 	Availability                string                `yaml:"availability,omitempty"`
+}
+
+// Name returns the name of the Config.
+func (*SDConfig) Name() string { return "openstack" }
+
+// NewDiscoverer returns a Discoverer for the Config.
+func (c *SDConfig) NewDiscoverer(opts discoverer.Options) (discoverer.Discoverer, error) {
+	return NewDiscovery(c, opts.Logger)
+}
+
+// SetOptions applies the options to the Config.
+func (c *SDConfig) SetOptions(opts discoverer.ConfigOptions) {
+	config.SetTLSConfigDirectory(&c.TLSConfig, opts.Directory)
+}
+
+// Validate checks the Config for errors.
+func (c *SDConfig) Validate() error {
+	return config.ValidateTLSConfig(&c.TLSConfig)
 }
 
 // Role is the role of the target in OpenStack.

@@ -67,6 +67,9 @@ import (
 	"github.com/prometheus/prometheus/tsdb"
 	"github.com/prometheus/prometheus/util/strutil"
 	"github.com/prometheus/prometheus/web"
+
+	// register service discovery implementations
+	_ "github.com/prometheus/prometheus/discovery/install"
 )
 
 var (
