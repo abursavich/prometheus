@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/go-kit/kit/log"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/util/testutil"
 	"gopkg.in/yaml.v2"
@@ -38,11 +37,11 @@ host: %s
 	var cfg Config
 	testutil.Ok(t, yaml.Unmarshal([]byte(cfgString), &cfg))
 
-	d, err := NewDiscovery(&cfg, log.NewNopLogger())
+	r, err := newRefresher(&cfg)
 	testutil.Ok(t, err)
 
 	ctx := context.Background()
-	tgs, err := d.refresh(ctx)
+	tgs, err := r.Refresh(ctx)
 	testutil.Ok(t, err)
 
 	testutil.Equals(t, 1, len(tgs))

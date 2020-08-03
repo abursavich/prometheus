@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/docker/docker/client"
-	"github.com/go-kit/kit/log"
 	config_util "github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/common/version"
@@ -33,6 +32,7 @@ import (
 )
 
 const (
+	swarmName  = "dockerswarm"
 	swarmLabel = model.MetaLabelPrefix + "dockerswarm_"
 )
 
@@ -60,11 +60,19 @@ type Config struct {
 }
 
 // Name returns the name of the Config.
-func (*Config) Name() string { return "dockerswarm" }
+func (*Config) Name() string { return swarmName }
 
 // NewDiscoverer returns a Discoverer for the Config.
 func (c *Config) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
-	return NewDiscovery(c, opts.Logger)
+	r, err := newRefresher(c)
+	if err != nil {
+		return nil, err
+	}
+	return refresh.NewDiscoverer(
+		opts.Logger,
+		time.Duration(c.RefreshInterval),
+		r,
+	), nil
 }
 
 // SetOptions applies the options to the Config.
@@ -101,24 +109,13 @@ func (c *Config) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return nil
 }
 
-// Discovery periodically performs Docker Swarm requests. It implements
-// the Discoverer interface.
-type Discovery struct {
-	discovery.Discoverer
+type refresher struct {
 	client *client.Client
 	role   string
 	port   int
 }
 
-// NewDiscovery returns a new Discovery which periodically refreshes its targets.
-func NewDiscovery(conf *Config, logger log.Logger) (*Discovery, error) {
-	var err error
-
-	d := &Discovery{
-		port: conf.Port,
-		role: conf.Role,
-	}
-
+func newRefresher(conf *Config) (*refresher, error) {
 	hostURL, err := url.Parse(conf.Host)
 	if err != nil {
 		return nil, err
@@ -128,7 +125,6 @@ func NewDiscovery(conf *Config, logger log.Logger) (*Discovery, error) {
 		client.WithHost(conf.Host),
 		client.WithAPIVersionNegotiation(),
 	}
-
 	// There are other protocols than HTTP supported by the Docker daemon, like
 	// unix, which are not supported by the HTTP client. Passing HTTP client
 	// options to the Docker client makes those non-HTTP requests fail.
@@ -148,30 +144,29 @@ func NewDiscovery(conf *Config, logger log.Logger) (*Discovery, error) {
 			}),
 		)
 	}
-
-	d.client, err = client.NewClientWithOpts(opts...)
+	cli, err := client.NewClientWithOpts(opts...)
 	if err != nil {
 		return nil, fmt.Errorf("error setting up docker swarm client: %w", err)
 	}
 
-	d.Discoverer = refresh.NewDiscovery(
-		logger,
-		"dockerswarm",
-		time.Duration(conf.RefreshInterval),
-		d.refresh,
-	)
-	return d, nil
+	return &refresher{
+		client: cli,
+		port:   conf.Port,
+		role:   conf.Role,
+	}, nil
 }
 
-func (d *Discovery) refresh(ctx context.Context) ([]*targetgroup.Group, error) {
-	switch d.role {
+func (*refresher) Name() string { return swarmName }
+
+func (r *refresher) Refresh(ctx context.Context) ([]*targetgroup.Group, error) {
+	switch r.role {
 	case "services":
-		return d.refreshServices(ctx)
+		return r.refreshServices(ctx)
 	case "nodes":
-		return d.refreshNodes(ctx)
+		return r.refreshNodes(ctx)
 	case "tasks":
-		return d.refreshTasks(ctx)
+		return r.refreshTasks(ctx)
 	default:
-		panic(fmt.Errorf("unexpected role %s", d.role))
+		panic(fmt.Errorf("unexpected role %s", r.role))
 	}
 }
