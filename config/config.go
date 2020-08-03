@@ -149,10 +149,6 @@ func resolveFilepaths(dir string, cfg *Config) {
 		for _, c := range cfg.KubernetesSDConfigs {
 			SetHTTPClientConfigDirectory(&c.HTTPClientConfig, dir)
 		}
-		for _, c := range cfg.MarathonSDConfigs {
-			SetHTTPClientConfigDirectory(&c.HTTPClientConfig, dir)
-			c.AuthTokenFile = JoinDir(dir, c.AuthTokenFile)
-		}
 		for _, c := range cfg.ConsulSDConfigs {
 			SetTLSConfigDirectory(&c.TLSConfig, dir)
 		}
