@@ -31,6 +31,7 @@ import (
 	config_util "github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
 
+	"github.com/prometheus/prometheus/discovery/discoverer"
 	"github.com/prometheus/prometheus/discovery/refresh"
 	"github.com/prometheus/prometheus/discovery/targetgroup"
 	"github.com/prometheus/prometheus/util/strutil"
@@ -64,6 +65,10 @@ var DefaultSDConfig = SDConfig{
 	RefreshInterval: model.Duration(60 * time.Second),
 }
 
+func init() {
+	discoverer.RegisterConfig(&SDConfig{})
+}
+
 // Filter is the configuration for filtering EC2 instances.
 type Filter struct {
 	Name   string   `yaml:"name"`
@@ -82,6 +87,17 @@ type SDConfig struct {
 	Port            int                `yaml:"port"`
 	Filters         []*Filter          `yaml:"filters"`
 }
+
+// Name returns the name of the Config.
+func (*SDConfig) Name() string { return "ec2" }
+
+// NewDiscoverer returns a Discoverer for the Config.
+func (c *SDConfig) NewDiscoverer(opts discoverer.Options) (discoverer.Discoverer, error) {
+	return NewDiscovery(c, opts.Logger), nil
+}
+
+// SetOptions applies the options to the Config.
+func (c *SDConfig) SetOptions(opts discoverer.ConfigOptions) {}
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
 func (c *SDConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
