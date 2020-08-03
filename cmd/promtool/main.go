@@ -39,6 +39,7 @@ import (
 	"gopkg.in/alecthomas/kingpin.v2"
 
 	"github.com/prometheus/prometheus/config"
+	"github.com/prometheus/prometheus/discovery/kubernetes"
 	"github.com/prometheus/prometheus/pkg/rulefmt"
 
 	// register service discovery implementations
@@ -261,9 +262,12 @@ func checkConfig(filename string) ([]string, error) {
 			return nil, err
 		}
 
-		for _, kd := range scfg.ServiceDiscoveryConfig.KubernetesSDConfigs {
-			if err := config.ValidateHTTPClientConfig(&kd.HTTPClientConfig); err != nil {
-				return nil, err
+		for _, c := range scfg.ServiceDiscoveryConfig.Configs {
+			switch c := c.(type) {
+			case *kubernetes.SDConfig:
+				if err := config.ValidateHTTPClientConfig(&c.HTTPClientConfig); err != nil {
+					return nil, err
+				}
 			}
 		}
 
