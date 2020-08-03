@@ -41,6 +41,7 @@ import (
 )
 
 const (
+	azureName                      = "azure"
 	azureLabel                     = model.MetaLabelPrefix + "azure_"
 	azureLabelSubscriptionID       = azureLabel + "subscription_id"
 	azureLabelTenantID             = azureLabel + "tenant_id"
@@ -83,11 +84,15 @@ type Config struct {
 }
 
 // Name returns the name of the Config.
-func (*Config) Name() string { return "azure" }
+func (*Config) Name() string { return azureName }
 
 // NewDiscoverer returns a Discoverer for the Config.
 func (c *Config) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
-	return NewDiscovery(c, opts.Logger), nil
+	return refresh.NewDiscoverer(
+		opts.Logger,
+		time.Duration(c.RefreshInterval),
+		newRefresher(c, opts.Logger),
+	), nil
 }
 
 // SetOptions applies the options to the Config.
@@ -135,30 +140,19 @@ func (c *Config) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return nil
 }
 
-type Discovery struct {
-	discovery.Discoverer
+type refresher struct {
 	logger log.Logger
 	cfg    *Config
-	port   int
 }
 
-// NewDiscovery returns a new AzureDiscovery which periodically refreshes its targets.
-func NewDiscovery(cfg *Config, logger log.Logger) *Discovery {
+func newRefresher(cfg *Config, logger log.Logger) *refresher {
 	if logger == nil {
 		logger = log.NewNopLogger()
 	}
-	d := &Discovery{
+	return &refresher{
 		cfg:    cfg,
-		port:   cfg.Port,
 		logger: logger,
 	}
-	d.Discoverer = refresh.NewDiscovery(
-		logger,
-		"azure",
-		time.Duration(cfg.RefreshInterval),
-		d.refresh,
-	)
-	return d
 }
 
 // azureClient represents multiple Azure Resource Manager providers.
@@ -260,10 +254,12 @@ func newAzureResourceFromID(id string, logger log.Logger) (azureResource, error)
 	}, nil
 }
 
-func (d *Discovery) refresh(ctx context.Context) ([]*targetgroup.Group, error) {
-	defer level.Debug(d.logger).Log("msg", "Azure discovery completed")
+func (*refresher) Name() string { return azureName }
 
-	client, err := createAzureClient(*d.cfg)
+func (r *refresher) Refresh(ctx context.Context) ([]*targetgroup.Group, error) {
+	defer level.Debug(r.logger).Log("msg", "Azure discovery completed")
+
+	client, err := createAzureClient(*r.cfg)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not create Azure client")
 	}
@@ -273,7 +269,7 @@ func (d *Discovery) refresh(ctx context.Context) ([]*targetgroup.Group, error) {
 		return nil, errors.Wrap(err, "could not get virtual machines")
 	}
 
-	level.Debug(d.logger).Log("msg", "Found virtual machines during Azure discovery.", "count", len(machines))
+	level.Debug(r.logger).Log("msg", "Found virtual machines during Azure discovery.", "count", len(machines))
 
 	// Load the vms managed by scale sets.
 	scaleSets, err := client.getScaleSets(ctx)
@@ -302,20 +298,20 @@ func (d *Discovery) refresh(ctx context.Context) ([]*targetgroup.Group, error) {
 	for i, vm := range machines {
 		go func(i int, vm virtualMachine) {
 			defer wg.Done()
-			r, err := newAzureResourceFromID(vm.ID, d.logger)
+			res, err := newAzureResourceFromID(vm.ID, r.logger)
 			if err != nil {
 				ch <- target{labelSet: nil, err: err}
 				return
 			}
 
 			labels := model.LabelSet{
-				azureLabelSubscriptionID:       model.LabelValue(d.cfg.SubscriptionID),
-				azureLabelTenantID:             model.LabelValue(d.cfg.TenantID),
+				azureLabelSubscriptionID:       model.LabelValue(r.cfg.SubscriptionID),
+				azureLabelTenantID:             model.LabelValue(r.cfg.TenantID),
 				azureLabelMachineID:            model.LabelValue(vm.ID),
 				azureLabelMachineName:          model.LabelValue(vm.Name),
 				azureLabelMachineOSType:        model.LabelValue(vm.OsType),
 				azureLabelMachineLocation:      model.LabelValue(vm.Location),
-				azureLabelMachineResourceGroup: model.LabelValue(r.ResourceGroup),
+				azureLabelMachineResourceGroup: model.LabelValue(res.ResourceGroup),
 			}
 
 			if vm.ScaleSet != "" {
@@ -332,7 +328,7 @@ func (d *Discovery) refresh(ctx context.Context) ([]*targetgroup.Group, error) {
 				networkInterface, err := client.getNetworkInterfaceByID(ctx, nicID)
 
 				if err != nil {
-					level.Error(d.logger).Log("msg", "Unable to get network interface", "name", nicID, "err", err)
+					level.Error(r.logger).Log("msg", "Unable to get network interface", "name", nicID, "err", err)
 					ch <- target{labelSet: nil, err: err}
 					// Get out of this routine because we cannot continue without a network interface.
 					return
@@ -347,7 +343,7 @@ func (d *Discovery) refresh(ctx context.Context) ([]*targetgroup.Group, error) {
 				// yet support this. On deallocated machines, this value happens to be nil so it
 				// is a cheap and easy way to determine if a machine is allocated or not.
 				if networkInterface.Primary == nil {
-					level.Debug(d.logger).Log("msg", "Skipping deallocated virtual machine", "machine", vm.Name)
+					level.Debug(r.logger).Log("msg", "Skipping deallocated virtual machine", "machine", vm.Name)
 					return
 				}
 
@@ -358,7 +354,7 @@ func (d *Discovery) refresh(ctx context.Context) ([]*targetgroup.Group, error) {
 						}
 						if ip.PrivateIPAddress != nil {
 							labels[azureLabelMachinePrivateIP] = model.LabelValue(*ip.PrivateIPAddress)
-							address := net.JoinHostPort(*ip.PrivateIPAddress, fmt.Sprintf("%d", d.port))
+							address := net.JoinHostPort(*ip.PrivateIPAddress, fmt.Sprintf("%d", r.cfg.Port))
 							labels[model.AddressLabel] = model.LabelValue(address)
 							ch <- target{labelSet: labels, err: nil}
 							return
