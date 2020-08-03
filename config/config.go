@@ -145,20 +145,20 @@ func resolveFilepaths(dir string, cfg *Config) {
 	for i, rf := range cfg.RuleFiles {
 		cfg.RuleFiles[i] = JoinDir(dir, rf)
 	}
-	sdPaths := func(cfg *discoverer.ServiceDiscoveryConfig) {
-		for _, cfg := range cfg.Configs {
-			cfg.SetOptions(discoverer.ConfigOptions{
-				Directory: dir,
-			})
-		}
+	cfgOpts := discoverer.ConfigOptions{
+		Directory: dir,
 	}
 	for _, c := range cfg.ScrapeConfigs {
 		SetHTTPClientConfigDirectory(&c.HTTPClientConfig, dir)
-		sdPaths(&c.ServiceDiscoveryConfig)
+		for _, c := range c.ServiceDiscoveryConfigs {
+			c.SetOptions(cfgOpts)
+		}
 	}
 	for _, c := range cfg.AlertingConfig.AlertmanagerConfigs {
 		SetHTTPClientConfigDirectory(&c.HTTPClientConfig, dir)
-		sdPaths(&c.ServiceDiscoveryConfig)
+		for _, c := range c.ServiceDiscoveryConfigs {
+			c.SetOptions(cfgOpts)
+		}
 	}
 	for _, c := range cfg.RemoteReadConfigs {
 		SetHTTPClientConfigDirectory(&c.HTTPClientConfig, dir)
@@ -342,8 +342,8 @@ type ScrapeConfig struct {
 	// We cannot do proper Go type embedding below as the parser will then parse
 	// values arbitrarily into the overflow maps of further-down types.
 
-	ServiceDiscoveryConfig discoverer.ServiceDiscoveryConfig `yaml:",inline"`
-	HTTPClientConfig       config_util.HTTPClientConfig      `yaml:",inline"`
+	ServiceDiscoveryConfigs []discoverer.Config          `yaml:"-"`
+	HTTPClientConfig        config_util.HTTPClientConfig `yaml:",inline"`
 
 	// List of target relabel configurations.
 	RelabelConfigs []*relabel.Config `yaml:"relabel_configs,omitempty"`
@@ -368,16 +368,9 @@ func (c *ScrapeConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		return err
 	}
 
-	// The UnmarshalYAML method of ServiceDiscoveryConfig is not being called because it's not a pointer.
-	// We cannot make it a pointer as the parser panics for inlined pointer structs.
-	// Thus we just do its validation here.
-	if err := c.ServiceDiscoveryConfig.Validate(); err != nil {
-		return err
-	}
-
 	// Check for users putting URLs in target groups.
 	if len(c.RelabelConfigs) == 0 {
-		if err := checkStaticTargets(c.ServiceDiscoveryConfig.Configs); err != nil {
+		if err := checkStaticTargets(c.ServiceDiscoveryConfigs); err != nil {
 			return err
 		}
 	}
@@ -476,8 +469,8 @@ type AlertmanagerConfig struct {
 	// We cannot do proper Go type embedding below as the parser will then parse
 	// values arbitrarily into the overflow maps of further-down types.
 
-	ServiceDiscoveryConfig discoverer.ServiceDiscoveryConfig `yaml:",inline"`
-	HTTPClientConfig       config_util.HTTPClientConfig      `yaml:",inline"`
+	ServiceDiscoveryConfigs []discoverer.Config          `yaml:"-"`
+	HTTPClientConfig        config_util.HTTPClientConfig `yaml:",inline"`
 
 	// The URL scheme to use when talking to Alertmanagers.
 	Scheme string `yaml:"scheme,omitempty"`
@@ -507,16 +500,9 @@ func (c *AlertmanagerConfig) UnmarshalYAML(unmarshal func(interface{}) error) er
 		return err
 	}
 
-	// The UnmarshalYAML method of ServiceDiscoveryConfig is not being called because it's not a pointer.
-	// We cannot make it a pointer as the parser panics for inlined pointer structs.
-	// Thus we just do its validation here.
-	if err := c.ServiceDiscoveryConfig.Validate(); err != nil {
-		return err
-	}
-
 	// Check for users putting URLs in target groups.
 	if len(c.RelabelConfigs) == 0 {
-		if err := checkStaticTargets(c.ServiceDiscoveryConfig.Configs); err != nil {
+		if err := checkStaticTargets(c.ServiceDiscoveryConfigs); err != nil {
 			return err
 		}
 	}

@@ -40,7 +40,6 @@ import (
 
 	"github.com/prometheus/prometheus/config"
 	"github.com/prometheus/prometheus/discovery/file"
-	"github.com/prometheus/prometheus/discovery/kubernetes"
 	"github.com/prometheus/prometheus/pkg/rulefmt"
 
 	// register service discovery implementations
@@ -263,13 +262,11 @@ func checkConfig(filename string) ([]string, error) {
 			return nil, err
 		}
 
-		for _, c := range scfg.ServiceDiscoveryConfig.Configs {
-			switch c := c.(type) {
-			case *kubernetes.SDConfig:
-				if err := config.ValidateHTTPClientConfig(&c.HTTPClientConfig); err != nil {
-					return nil, err
-				}
-			case *file.SDConfig:
+		for _, c := range scfg.ServiceDiscoveryConfigs {
+			if err := c.Validate(); err != nil {
+				return nil, errors.Wrapf(err, "error validating %v service discovery config", c.Name())
+			}
+			if c, ok := c.(*file.SDConfig); ok {
 				for _, file := range c.Files {
 					files, err := filepath.Glob(file)
 					if err != nil {

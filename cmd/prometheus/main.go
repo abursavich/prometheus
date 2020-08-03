@@ -459,17 +459,17 @@ func main() {
 		// they need to read the most updated config when receiving the new targets list.
 		scrapeManager.ApplyConfig,
 		func(cfg *config.Config) error {
-			c := make(map[string]discoverer.ServiceDiscoveryConfig)
+			c := make(map[string][]discoverer.Config)
 			for _, v := range cfg.ScrapeConfigs {
-				c[v.JobName] = v.ServiceDiscoveryConfig
+				c[v.JobName] = v.ServiceDiscoveryConfigs
 			}
 			return discoveryManagerScrape.ApplyConfig(c)
 		},
 		notifierManager.ApplyConfig,
 		func(cfg *config.Config) error {
-			c := make(map[string]discoverer.ServiceDiscoveryConfig)
+			c := make(map[string][]discoverer.Config)
 			for k, v := range cfg.AlertingConfig.AlertmanagerConfigs.ToMap() {
-				c[k] = v.ServiceDiscoveryConfig
+				c[k] = v.ServiceDiscoveryConfigs
 			}
 			return discoveryManagerNotify.ApplyConfig(c)
 		},
