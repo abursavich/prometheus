@@ -31,6 +31,8 @@ import (
 	config_util "github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
 
+	"github.com/prometheus/prometheus/config"
+	"github.com/prometheus/prometheus/discovery/discoverer"
 	"github.com/prometheus/prometheus/discovery/refresh"
 	"github.com/prometheus/prometheus/discovery/targetgroup"
 	"github.com/prometheus/prometheus/util/strutil"
@@ -63,6 +65,10 @@ var DefaultSDConfig = SDConfig{
 	RefreshInterval: model.Duration(30 * time.Second),
 }
 
+func init() {
+	discoverer.RegisterConfig(&SDConfig{})
+}
+
 // SDConfig is the configuration for services running on Marathon.
 type SDConfig struct {
 	Servers          []string                     `yaml:"servers,omitempty"`
@@ -70,6 +76,20 @@ type SDConfig struct {
 	AuthToken        config_util.Secret           `yaml:"auth_token,omitempty"`
 	AuthTokenFile    string                       `yaml:"auth_token_file,omitempty"`
 	HTTPClientConfig config_util.HTTPClientConfig `yaml:",inline"`
+}
+
+// Name returns the name of the Config.
+func (*SDConfig) Name() string { return "marathon" }
+
+// NewDiscoverer returns a Discoverer for the Config.
+func (c *SDConfig) NewDiscoverer(opts discoverer.Options) (discoverer.Discoverer, error) {
+	return NewDiscovery(*c, opts.Logger)
+}
+
+// SetOptions applies the options to the Config.
+func (c *SDConfig) SetOptions(opts discoverer.ConfigOptions) {
+	config.SetHTTPClientConfigDirectory(&c.HTTPClientConfig, opts.Directory)
+	c.AuthTokenFile = config.JoinDir(opts.Directory, c.AuthTokenFile)
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
