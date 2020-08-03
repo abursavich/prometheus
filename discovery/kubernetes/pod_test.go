@@ -191,7 +191,7 @@ func expectedPodTargetGroups(ns string) map[string]*targetgroup.Group {
 }
 
 func TestPodDiscoveryBeforeRun(t *testing.T) {
-	n, c := makeDiscovery(RolePod, NamespaceDiscovery{})
+	n, c := makeDiscovery(RolePod, nil)
 
 	k8sDiscoveryTest{
 		discovery: n,
@@ -248,7 +248,7 @@ func TestPodDiscoveryBeforeRun(t *testing.T) {
 }
 
 func TestPodDiscoveryInitContainer(t *testing.T) {
-	n, c := makeDiscovery(RolePod, NamespaceDiscovery{})
+	n, c := makeDiscovery(RolePod, nil)
 
 	ns := "default"
 	key := fmt.Sprintf("pod/%s/testpod", ns)
@@ -273,7 +273,7 @@ func TestPodDiscoveryInitContainer(t *testing.T) {
 }
 
 func TestPodDiscoveryAdd(t *testing.T) {
-	n, c := makeDiscovery(RolePod, NamespaceDiscovery{})
+	n, c := makeDiscovery(RolePod, nil)
 
 	k8sDiscoveryTest{
 		discovery: n,
@@ -288,7 +288,7 @@ func TestPodDiscoveryAdd(t *testing.T) {
 
 func TestPodDiscoveryDelete(t *testing.T) {
 	obj := makePods()
-	n, c := makeDiscovery(RolePod, NamespaceDiscovery{}, obj)
+	n, c := makeDiscovery(RolePod, nil, obj)
 
 	k8sDiscoveryTest{
 		discovery: n,
@@ -332,7 +332,7 @@ func TestPodDiscoveryUpdate(t *testing.T) {
 			HostIP: "2.3.4.5",
 		},
 	}
-	n, c := makeDiscovery(RolePod, NamespaceDiscovery{}, obj)
+	n, c := makeDiscovery(RolePod, nil, obj)
 
 	k8sDiscoveryTest{
 		discovery: n,
@@ -346,7 +346,7 @@ func TestPodDiscoveryUpdate(t *testing.T) {
 }
 
 func TestPodDiscoveryUpdateEmptyPodIP(t *testing.T) {
-	n, c := makeDiscovery(RolePod, NamespaceDiscovery{})
+	n, c := makeDiscovery(RolePod, nil)
 	initialPod := makePods()
 
 	updatedPod := makePods()
@@ -370,7 +370,7 @@ func TestPodDiscoveryUpdateEmptyPodIP(t *testing.T) {
 }
 
 func TestPodDiscoveryNamespaces(t *testing.T) {
-	n, c := makeDiscovery(RolePod, NamespaceDiscovery{Names: []string{"ns1", "ns2"}})
+	n, c := makeDiscovery(RolePod, []string{"ns1", "ns2"})
 
 	expected := expectedPodTargetGroups("ns1")
 	for k, v := range expectedPodTargetGroups("ns2") {

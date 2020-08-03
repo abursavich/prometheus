@@ -35,14 +35,14 @@ func TestMain(m *testing.M) {
 }
 
 // makeDiscovery creates a kubernetes.Discovery instance for testing.
-func makeDiscovery(role Role, nsDiscovery NamespaceDiscovery, objects ...runtime.Object) (*discoverer, kubernetes.Interface) {
+func makeDiscovery(role Role, namespaces []string, objects ...runtime.Object) (*discoverer, kubernetes.Interface) {
 	clientset := fake.NewSimpleClientset(objects...)
 
 	return &discoverer{
-		client:             clientset,
-		logger:             log.NewNopLogger(),
-		role:               role,
-		namespaceDiscovery: &nsDiscovery,
+		client:     clientset,
+		logger:     log.NewNopLogger(),
+		role:       role,
+		namespaces: namespaces,
 	}, clientset
 }
 

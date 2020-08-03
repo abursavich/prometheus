@@ -108,11 +108,11 @@ func (c *Role) UnmarshalYAML(unmarshal func(interface{}) error) error {
 
 // Config is the configuration for Kubernetes service discovery.
 type Config struct {
-	APIServer          config_util.URL              `yaml:"api_server,omitempty"`
-	Role               Role                         `yaml:"role"`
-	HTTPClientConfig   config_util.HTTPClientConfig `yaml:",inline"`
-	NamespaceDiscovery NamespaceDiscovery           `yaml:"namespaces,omitempty"`
-	Selectors          []SelectorConfig             `yaml:"selectors,omitempty"`
+	APIServer        config_util.URL              `yaml:"api_server,omitempty"`
+	Role             Role                         `yaml:"role"`
+	HTTPClientConfig config_util.HTTPClientConfig `yaml:",inline"`
+	Namespaces       Namespaces                   `yaml:"namespaces,omitempty"`
+	Selectors        []SelectorConfig             `yaml:"selectors,omitempty"`
 }
 
 // Name returns the name of the Config.
@@ -213,16 +213,16 @@ func (c *Config) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return nil
 }
 
-// NamespaceDiscovery is the configuration for discovering
+// Namespaces is the configuration for discovering
 // Kubernetes namespaces.
-type NamespaceDiscovery struct {
+type Namespaces struct {
 	Names []string `yaml:"names"`
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
-func (c *NamespaceDiscovery) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	*c = NamespaceDiscovery{}
-	type plain NamespaceDiscovery
+func (c *Namespaces) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	*c = Namespaces{}
+	type plain Namespaces
 	return unmarshal((*plain)(c))
 }
 
@@ -230,20 +230,12 @@ func (c *NamespaceDiscovery) UnmarshalYAML(unmarshal func(interface{}) error) er
 // targets from Kubernetes.
 type discoverer struct {
 	sync.RWMutex
-	client             kubernetes.Interface
-	role               Role
-	logger             log.Logger
-	namespaceDiscovery *NamespaceDiscovery
-	discoverers        []discovery.Discoverer
-	selectors          roleSelector
-}
-
-func (d *discoverer) getNamespaces() []string {
-	namespaces := d.namespaceDiscovery.Names
-	if len(namespaces) == 0 {
-		namespaces = []string{apiv1.NamespaceAll}
-	}
-	return namespaces
+	client      kubernetes.Interface
+	role        Role
+	logger      log.Logger
+	namespaces  []string
+	discoverers []discovery.Discoverer
+	selectors   roleSelector
 }
 
 // newDiscoverer creates a new Kubernetes discovery for the given role.
@@ -280,13 +272,14 @@ func newDiscoverer(l log.Logger, conf *Config) (*discoverer, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return &discoverer{
-		client:             c,
-		logger:             l,
-		role:               conf.Role,
-		namespaceDiscovery: &conf.NamespaceDiscovery,
-		discoverers:        make([]discovery.Discoverer, 0),
-		selectors:          mapSelector(conf.Selectors),
+		client:      c,
+		logger:      l,
+		role:        conf.Role,
+		namespaces:  conf.Namespaces.Names,
+		discoverers: make([]discovery.Discoverer, 0),
+		selectors:   mapSelector(conf.Selectors),
 	}, nil
 }
 
@@ -319,7 +312,11 @@ const resyncPeriod = 10 * time.Minute
 // Run implements the discoverer interface.
 func (d *discoverer) Run(ctx context.Context, ch chan<- []*targetgroup.Group) {
 	d.Lock()
-	namespaces := d.getNamespaces()
+
+	namespaces := d.namespaces
+	if len(d.namespaces) == 0 {
+		namespaces = []string{apiv1.NamespaceAll}
+	}
 
 	switch d.role {
 	case RoleEndpoint:
