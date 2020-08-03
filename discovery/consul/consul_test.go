@@ -36,7 +36,7 @@ func TestMain(m *testing.M) {
 func TestConfiguredService(t *testing.T) {
 	conf := &Config{
 		Services: []string{"configuredServiceName"}}
-	consulDiscovery, err := NewDiscovery(conf, nil)
+	consulDiscovery, err := newDiscoverer(conf, nil)
 
 	if err != nil {
 		t.Errorf("Unexpected error when initializing discovery %v", err)
@@ -54,7 +54,7 @@ func TestConfiguredServiceWithTag(t *testing.T) {
 		Services:    []string{"configuredServiceName"},
 		ServiceTags: []string{"http"},
 	}
-	consulDiscovery, err := NewDiscovery(conf, nil)
+	consulDiscovery, err := newDiscoverer(conf, nil)
 
 	if err != nil {
 		t.Errorf("Unexpected error when initializing discovery %v", err)
@@ -150,7 +150,7 @@ func TestConfiguredServiceWithTags(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		consulDiscovery, err := NewDiscovery(tc.conf, nil)
+		consulDiscovery, err := newDiscoverer(tc.conf, nil)
 
 		if err != nil {
 			t.Errorf("Unexpected error when initializing discovery %v", err)
@@ -165,7 +165,7 @@ func TestConfiguredServiceWithTags(t *testing.T) {
 
 func TestNonConfiguredService(t *testing.T) {
 	conf := &Config{}
-	consulDiscovery, err := NewDiscovery(conf, nil)
+	consulDiscovery, err := newDiscoverer(conf, nil)
 
 	if err != nil {
 		t.Errorf("Unexpected error when initializing discovery %v", err)
@@ -261,9 +261,9 @@ func newServer(t *testing.T) (*httptest.Server, *Config) {
 	return stub, config
 }
 
-func newDiscovery(t *testing.T, config *Config) *Discovery {
+func mustNewDiscoverer(t *testing.T, config *Config) *discoverer {
 	logger := log.NewNopLogger()
-	d, err := NewDiscovery(config, logger)
+	d, err := newDiscoverer(config, logger)
 	testutil.Ok(t, err)
 	return d
 }
@@ -284,7 +284,7 @@ func TestAllServices(t *testing.T) {
 	stub, config := newServer(t)
 	defer stub.Close()
 
-	d := newDiscovery(t, config)
+	d := mustNewDiscoverer(t, config)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	ch := make(chan []*targetgroup.Group)
@@ -304,7 +304,7 @@ func TestOneService(t *testing.T) {
 	defer stub.Close()
 
 	config.Services = []string{"test"}
-	d := newDiscovery(t, config)
+	d := mustNewDiscoverer(t, config)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	ch := make(chan []*targetgroup.Group)
@@ -324,7 +324,7 @@ func TestAllOptions(t *testing.T) {
 	config.AllowStale = true
 	config.Token = "fake-token"
 
-	d := newDiscovery(t, config)
+	d := mustNewDiscoverer(t, config)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	ch := make(chan []*targetgroup.Group)
@@ -367,7 +367,7 @@ func TestGetDatacenterShouldReturnError(t *testing.T) {
 			RefreshInterval: model.Duration(1 * time.Second),
 		}
 		defer stub.Close()
-		d := newDiscovery(t, config)
+		d := mustNewDiscoverer(t, config)
 
 		// Should be empty if not initialized.
 		testutil.Equals(t, "", d.clientDatacenter)

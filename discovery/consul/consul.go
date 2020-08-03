@@ -143,7 +143,7 @@ func (*Config) Name() string { return "consul" }
 
 // NewDiscoverer returns a Discoverer for the Config.
 func (c *Config) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
-	return NewDiscovery(c, opts.Logger)
+	return newDiscoverer(c, opts.Logger)
 }
 
 // SetOptions applies the options to the Config.
@@ -170,9 +170,9 @@ func (c *Config) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return nil
 }
 
-// Discovery retrieves target information from a Consul server
+// discoverer retrieves target information from a Consul server
 // and updates them via watches.
-type Discovery struct {
+type discoverer struct {
 	client           *consul.Client
 	clientDatacenter string
 	tagSeparator     string
@@ -185,8 +185,8 @@ type Discovery struct {
 	logger           log.Logger
 }
 
-// NewDiscovery returns a new Discovery for the given config.
-func NewDiscovery(conf *Config, logger log.Logger) (*Discovery, error) {
+// newDiscoverer returns a new Discovery for the given config.
+func newDiscoverer(conf *Config, logger log.Logger) (*discoverer, error) {
 	if logger == nil {
 		logger = log.NewNopLogger()
 	}
@@ -223,7 +223,7 @@ func NewDiscovery(conf *Config, logger log.Logger) (*Discovery, error) {
 	if err != nil {
 		return nil, err
 	}
-	cd := &Discovery{
+	cd := &discoverer{
 		client:           client,
 		tagSeparator:     conf.TagSeparator,
 		watchedServices:  conf.Services,
@@ -239,12 +239,12 @@ func NewDiscovery(conf *Config, logger log.Logger) (*Discovery, error) {
 }
 
 // shouldWatch returns whether the service of the given name should be watched.
-func (d *Discovery) shouldWatch(name string, tags []string) bool {
+func (d *discoverer) shouldWatch(name string, tags []string) bool {
 	return d.shouldWatchFromName(name) && d.shouldWatchFromTags(tags)
 }
 
 // shouldWatch returns whether the service of the given name should be watched based on its name.
-func (d *Discovery) shouldWatchFromName(name string) bool {
+func (d *discoverer) shouldWatchFromName(name string) bool {
 	// If there's no fixed set of watched services, we watch everything.
 	if len(d.watchedServices) == 0 {
 		return true
@@ -261,7 +261,7 @@ func (d *Discovery) shouldWatchFromName(name string) bool {
 // shouldWatch returns whether the service of the given name should be watched based on its tags.
 // This gets called when the user doesn't specify a list of services in order to avoid watching
 // *all* services. Details in https://github.com/prometheus/prometheus/pull/3814
-func (d *Discovery) shouldWatchFromTags(tags []string) bool {
+func (d *discoverer) shouldWatchFromTags(tags []string) bool {
 	// If there's no fixed set of watched tags, we watch everything.
 	if len(d.watchedTags) == 0 {
 		return true
@@ -280,7 +280,7 @@ tagOuter:
 }
 
 // Get the local datacenter if not specified.
-func (d *Discovery) getDatacenter() error {
+func (d *discoverer) getDatacenter() error {
 	// If the datacenter was not set from clientConf, let's get it from the local Consul agent
 	// (Consul default is to use local node's datacenter if one isn't given for a query).
 	if d.clientDatacenter != "" {
@@ -306,7 +306,7 @@ func (d *Discovery) getDatacenter() error {
 }
 
 // Initialize the Discoverer run.
-func (d *Discovery) initialize(ctx context.Context) {
+func (d *discoverer) initialize(ctx context.Context) {
 	// Loop until we manage to get the local datacenter.
 	for {
 		// We have to check the context at least once. The checks during channel sends
@@ -329,7 +329,7 @@ func (d *Discovery) initialize(ctx context.Context) {
 }
 
 // Run implements the Discoverer interface.
-func (d *Discovery) Run(ctx context.Context, ch chan<- []*targetgroup.Group) {
+func (d *discoverer) Run(ctx context.Context, ch chan<- []*targetgroup.Group) {
 	if d.finalizer != nil {
 		defer d.finalizer()
 	}
@@ -365,7 +365,7 @@ func (d *Discovery) Run(ctx context.Context, ch chan<- []*targetgroup.Group) {
 // Watch the catalog for new services we would like to watch. This is called only
 // when we don't know yet the names of the services and need to ask Consul the
 // entire list of services.
-func (d *Discovery) watchServices(ctx context.Context, ch chan<- []*targetgroup.Group, lastIndex *uint64, services map[string]func()) {
+func (d *discoverer) watchServices(ctx context.Context, ch chan<- []*targetgroup.Group, lastIndex *uint64, services map[string]func()) {
 	catalog := d.client.Catalog()
 	level.Debug(d.logger).Log("msg", "Watching services", "tags", strings.Join(d.watchedTags, ","))
 
@@ -439,14 +439,14 @@ type consulService struct {
 	name         string
 	tags         []string
 	labels       model.LabelSet
-	discovery    *Discovery
+	discovery    *discoverer
 	client       *consul.Client
 	tagSeparator string
 	logger       log.Logger
 }
 
 // Start watching a service.
-func (d *Discovery) watchService(ctx context.Context, ch chan<- []*targetgroup.Group, name string) {
+func (d *discoverer) watchService(ctx context.Context, ch chan<- []*targetgroup.Group, name string) {
 	srv := &consulService{
 		discovery: d,
 		client:    d.client,
