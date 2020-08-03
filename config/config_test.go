@@ -367,8 +367,8 @@ var expectedConf = &Config{
 			Scheme:      DefaultScrapeConfig.Scheme,
 
 			ServiceDiscoveryConfig: discoverer.ServiceDiscoveryConfig{
-				KubernetesSDConfigs: []*kubernetes.SDConfig{
-					{
+				Configs: []discoverer.Config{
+					&kubernetes.SDConfig{
 						APIServer: kubernetesSDHostURL(),
 						Role:      kubernetes.RoleEndpoint,
 						HTTPClientConfig: config_util.HTTPClientConfig{
@@ -403,8 +403,8 @@ var expectedConf = &Config{
 			},
 
 			ServiceDiscoveryConfig: discoverer.ServiceDiscoveryConfig{
-				KubernetesSDConfigs: []*kubernetes.SDConfig{
-					{
+				Configs: []discoverer.Config{
+					&kubernetes.SDConfig{
 						APIServer: kubernetesSDHostURL(),
 						Role:      kubernetes.RoleEndpoint,
 						NamespaceDiscovery: kubernetes.NamespaceDiscovery{
