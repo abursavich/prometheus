@@ -19,7 +19,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/prometheus/prometheus/discovery/consul"
-	"github.com/prometheus/prometheus/discovery/dns"
 	"github.com/prometheus/prometheus/discovery/ec2"
 	"github.com/prometheus/prometheus/discovery/file"
 	"github.com/prometheus/prometheus/discovery/gce"
@@ -29,8 +28,6 @@ import (
 
 // ServiceDiscoveryConfig configures lists of different service discovery mechanisms.
 type ServiceDiscoveryConfig struct {
-	// List of DNS service discovery configurations.
-	DNSSDConfigs []*dns.SDConfig `yaml:"dns_sd_configs,omitempty"`
 	// List of file service discovery configurations.
 	FileSDConfigs []*file.SDConfig `yaml:"file_sd_configs,omitempty"`
 	// List of Consul service discovery configurations.
@@ -55,11 +52,6 @@ func (c *ServiceDiscoveryConfig) Validate() error {
 	for _, cfg := range c.ConsulSDConfigs {
 		if cfg == nil {
 			return errors.New("empty or null section in consul_sd_configs")
-		}
-	}
-	for _, cfg := range c.DNSSDConfigs {
-		if cfg == nil {
-			return errors.New("empty or null section in dns_sd_configs")
 		}
 	}
 	for _, cfg := range c.EC2SDConfigs {
