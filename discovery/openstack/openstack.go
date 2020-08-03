@@ -140,7 +140,7 @@ type refresher interface {
 }
 
 // NewDiscovery returns a new OpenStack Discoverer which periodically refreshes its targets.
-func NewDiscovery(conf *Config, l log.Logger) (*refresh.Discovery, error) {
+func NewDiscovery(conf *Config, l log.Logger) (discovery.Discoverer, error) {
 	r, err := newRefresher(conf, l)
 	if err != nil {
 		return nil, err

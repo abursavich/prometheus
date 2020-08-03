@@ -116,7 +116,7 @@ func (c *Config) UnmarshalYAML(unmarshal func(interface{}) error) error {
 // Discovery periodically performs GCE-SD requests. It implements
 // the Discoverer interface.
 type Discovery struct {
-	*refresh.Discovery
+	discovery.Discoverer
 	project      string
 	zone         string
 	filter       string
@@ -147,7 +147,7 @@ func NewDiscovery(conf Config, logger log.Logger) (*Discovery, error) {
 	}
 	d.isvc = compute.NewInstancesService(d.svc)
 
-	d.Discovery = refresh.NewDiscovery(
+	d.Discoverer = refresh.NewDiscovery(
 		logger,
 		"gce",
 		time.Duration(conf.RefreshInterval),

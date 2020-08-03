@@ -100,7 +100,7 @@ func (c *Config) UnmarshalYAML(unmarshal func(interface{}) error) error {
 // Discovery periodically performs DigitalOcean requests. It implements
 // the Discoverer interface.
 type Discovery struct {
-	*refresh.Discovery
+	discovery.Discoverer
 	client *godo.Client
 	port   int
 }
@@ -127,7 +127,7 @@ func NewDiscovery(conf *Config, logger log.Logger) (*Discovery, error) {
 		return nil, fmt.Errorf("error setting up digital ocean agent: %w", err)
 	}
 
-	d.Discovery = refresh.NewDiscovery(
+	d.Discoverer = refresh.NewDiscovery(
 		logger,
 		"digitalocean",
 		time.Duration(conf.RefreshInterval),

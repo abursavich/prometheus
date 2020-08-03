@@ -136,7 +136,7 @@ func (c *Config) UnmarshalYAML(unmarshal func(interface{}) error) error {
 }
 
 type Discovery struct {
-	*refresh.Discovery
+	discovery.Discoverer
 	logger log.Logger
 	cfg    *Config
 	port   int
@@ -152,7 +152,7 @@ func NewDiscovery(cfg *Config, logger log.Logger) *Discovery {
 		port:   cfg.Port,
 		logger: logger,
 	}
-	d.Discovery = refresh.NewDiscovery(
+	d.Discoverer = refresh.NewDiscovery(
 		logger,
 		"azure",
 		time.Duration(cfg.RefreshInterval),

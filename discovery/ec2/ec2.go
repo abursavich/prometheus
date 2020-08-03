@@ -134,7 +134,7 @@ func (c *Config) UnmarshalYAML(unmarshal func(interface{}) error) error {
 // Discovery periodically performs EC2-SD requests. It implements
 // the Discoverer interface.
 type Discovery struct {
-	*refresh.Discovery
+	discovery.Discoverer
 	aws      *aws.Config
 	interval time.Duration
 	profile  string
@@ -164,7 +164,7 @@ func NewDiscovery(conf *Config, logger log.Logger) *Discovery {
 		interval: time.Duration(conf.RefreshInterval),
 		port:     conf.Port,
 	}
-	d.Discovery = refresh.NewDiscovery(
+	d.Discoverer = refresh.NewDiscovery(
 		logger,
 		"ec2",
 		time.Duration(conf.RefreshInterval),

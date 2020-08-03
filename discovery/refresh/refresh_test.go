@@ -54,18 +54,20 @@ func TestRefresh(t *testing.T) {
 	}
 
 	var i int
-	refresh := func(ctx context.Context) ([]*targetgroup.Group, error) {
-		i++
-		switch i {
-		case 1:
-			return tg1, nil
-		case 2:
-			return tg2, nil
-		}
-		return nil, fmt.Errorf("some error")
-	}
 	interval := time.Millisecond
-	d := NewDiscovery(nil, "test", interval, refresh)
+	d := NewDiscoverer(nil, interval, &refresher{
+		name: "test",
+		refresh: func(ctx context.Context) ([]*targetgroup.Group, error) {
+			switch i++; i {
+			case 1:
+				return tg1, nil
+			case 2:
+				return tg2, nil
+			default:
+				return nil, fmt.Errorf("some error")
+			}
+		},
+	})
 
 	ch := make(chan []*targetgroup.Group)
 	ctx, cancel := context.WithCancel(context.Background())
