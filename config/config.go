@@ -152,9 +152,6 @@ func resolveFilepaths(dir string, cfg *Config) {
 		for _, c := range cfg.ConsulSDConfigs {
 			SetTLSConfigDirectory(&c.TLSConfig, dir)
 		}
-		for _, c := range cfg.DockerSwarmSDConfigs {
-			SetHTTPClientConfigDirectory(&c.HTTPClientConfig, dir)
-		}
 		for _, filecfg := range cfg.FileSDConfigs {
 			for i, fn := range filecfg.Files {
 				filecfg.Files[i] = JoinDir(dir, fn)

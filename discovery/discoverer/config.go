@@ -20,7 +20,6 @@ import (
 
 	"github.com/prometheus/prometheus/discovery/consul"
 	"github.com/prometheus/prometheus/discovery/dns"
-	"github.com/prometheus/prometheus/discovery/dockerswarm"
 	"github.com/prometheus/prometheus/discovery/ec2"
 	"github.com/prometheus/prometheus/discovery/file"
 	"github.com/prometheus/prometheus/discovery/gce"
@@ -36,8 +35,6 @@ type ServiceDiscoveryConfig struct {
 	FileSDConfigs []*file.SDConfig `yaml:"file_sd_configs,omitempty"`
 	// List of Consul service discovery configurations.
 	ConsulSDConfigs []*consul.SDConfig `yaml:"consul_sd_configs,omitempty"`
-	// List of Docker Swarm service discovery configurations.
-	DockerSwarmSDConfigs []*dockerswarm.SDConfig `yaml:"dockerswarm_sd_configs,omitempty"`
 	// List of Serverset service discovery configurations.
 	ServersetSDConfigs []*zookeeper.ServersetSDConfig `yaml:"serverset_sd_configs,omitempty"`
 	// NerveSDConfigs is a list of Nerve service discovery configurations.
@@ -58,11 +55,6 @@ func (c *ServiceDiscoveryConfig) Validate() error {
 	for _, cfg := range c.ConsulSDConfigs {
 		if cfg == nil {
 			return errors.New("empty or null section in consul_sd_configs")
-		}
-	}
-	for _, cfg := range c.DockerSwarmSDConfigs {
-		if cfg == nil {
-			return errors.New("empty or null section in dockerswarm_sd_configs")
 		}
 	}
 	for _, cfg := range c.DNSSDConfigs {
