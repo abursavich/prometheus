@@ -18,6 +18,7 @@ import (
 	"io/ioutil"
 	"net/url"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"strings"
 	"time"
@@ -226,7 +227,7 @@ func (c *Config) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	// again, we have to hide it using a type indirection.
 	type plain Config
 	if err := unmarshal((*plain)(c)); err != nil {
-		return err
+		return replaceYAMLTypeError(err, reflect.TypeOf(plain{}), reflect.TypeOf(*c))
 	}
 
 	// If a global block was open but empty the default global config is overwritten.
@@ -314,7 +315,7 @@ func (c *GlobalConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	gc := &GlobalConfig{}
 	type plain GlobalConfig
 	if err := unmarshal((*plain)(gc)); err != nil {
-		return err
+		return replaceYAMLTypeError(err, reflect.TypeOf(plain{}), reflect.TypeOf(*c))
 	}
 
 	for _, l := range gc.ExternalLabels {
@@ -456,7 +457,7 @@ func (c *AlertingConfig) UnmarshalYAML(unmarshal func(interface{}) error) error 
 	*c = AlertingConfig{}
 	type plain AlertingConfig
 	if err := unmarshal((*plain)(c)); err != nil {
-		return err
+		return replaceYAMLTypeError(err, reflect.TypeOf(plain{}), reflect.TypeOf(*c))
 	}
 
 	for _, rlcfg := range c.AlertRelabelConfigs {
@@ -488,7 +489,7 @@ func (v *AlertmanagerAPIVersion) UnmarshalYAML(unmarshal func(interface{}) error
 	*v = AlertmanagerAPIVersion("")
 	type plain AlertmanagerAPIVersion
 	if err := unmarshal((*plain)(v)); err != nil {
-		return err
+		return replaceYAMLTypeError(err, reflect.TypeOf(plain("")), reflect.TypeOf(*v))
 	}
 
 	for _, supportedVersion := range SupportedAlertmanagerAPIVersions {
@@ -633,7 +634,7 @@ func (c *RemoteWriteConfig) UnmarshalYAML(unmarshal func(interface{}) error) err
 	*c = DefaultRemoteWriteConfig
 	type plain RemoteWriteConfig
 	if err := unmarshal((*plain)(c)); err != nil {
-		return err
+		return replaceYAMLTypeError(err, reflect.TypeOf(plain{}), reflect.TypeOf(*c))
 	}
 	if c.URL == nil {
 		return errors.New("url for remote_write is empty")
@@ -695,7 +696,7 @@ func (c *RemoteReadConfig) UnmarshalYAML(unmarshal func(interface{}) error) erro
 	*c = DefaultRemoteReadConfig
 	type plain RemoteReadConfig
 	if err := unmarshal((*plain)(c)); err != nil {
-		return err
+		return replaceYAMLTypeError(err, reflect.TypeOf(plain{}), reflect.TypeOf(*c))
 	}
 	if c.URL == nil {
 		return errors.New("url for remote_read is empty")
