@@ -841,7 +841,7 @@ var expectedErrors = []struct {
 		errMsg:   "invalid rule file path",
 	}, {
 		filename: "unknown_attr.bad.yml",
-		errMsg:   "field consult_sd_configs not found in type",
+		errMsg:   "field consult_sd_configs not found in type config.ScrapeConfig",
 	}, {
 		filename: "bearertoken.bad.yml",
 		errMsg:   "at most one of bearer_token & bearer_token_file must be configured",
@@ -913,7 +913,7 @@ var expectedErrors = []struct {
 		errMsg:   "relabel configuration for hashmod action requires 'target_label' value",
 	}, {
 		filename: "unknown_global_attr.bad.yml",
-		errMsg:   "field nonexistent_field not found in type config.plain",
+		errMsg:   "field nonexistent_field not found in type config.GlobalConfig",
 	}, {
 		filename: "remote_read_url_missing.bad.yml",
 		errMsg:   `url for remote_read is empty`,
@@ -933,7 +933,7 @@ var expectedErrors = []struct {
 	},
 	{
 		filename: "section_key_dup.bad.yml",
-		errMsg:   "field scrape_configs already set in type config.plain",
+		errMsg:   "field scrape_configs already set in type config.Config",
 	},
 	{
 		filename: "azure_client_id_missing.bad.yml",
