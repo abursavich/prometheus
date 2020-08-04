@@ -55,19 +55,16 @@ func TestRefresh(t *testing.T) {
 
 	var i int
 	interval := time.Millisecond
-	d := NewDiscoverer(nil, interval, &refresher{
-		name: "test",
-		refresh: func(ctx context.Context) ([]*targetgroup.Group, error) {
-			switch i++; i {
-			case 1:
-				return tg1, nil
-			case 2:
-				return tg2, nil
-			default:
-				return nil, fmt.Errorf("some error")
-			}
-		},
-	})
+	d := NewDiscoverer(nil, interval, testRefresher(func(ctx context.Context) ([]*targetgroup.Group, error) {
+		switch i++; i {
+		case 1:
+			return tg1, nil
+		case 2:
+			return tg2, nil
+		default:
+			return nil, fmt.Errorf("some error")
+		}
+	}))
 
 	ch := make(chan []*targetgroup.Group)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -88,3 +85,8 @@ func TestRefresh(t *testing.T) {
 	case <-tick.C:
 	}
 }
+
+type testRefresher func(ctx context.Context) ([]*targetgroup.Group, error)
+
+func (testRefresher) Name() string                                                 { return "test" }
+func (fn testRefresher) Refresh(ctx context.Context) ([]*targetgroup.Group, error) { return fn(ctx) }

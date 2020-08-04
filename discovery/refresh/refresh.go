@@ -77,14 +77,6 @@ func NewDiscoverer(logger log.Logger, interval time.Duration, refresher Refreshe
 	}
 }
 
-// NewDiscovery returns a Discoverer function that calls a refresh() function at every interval.
-func NewDiscovery(l log.Logger, mech string, interval time.Duration, refreshf func(ctx context.Context) ([]*targetgroup.Group, error)) discovery.Discoverer {
-	return NewDiscoverer(l, interval, &refresher{
-		name:    mech,
-		refresh: refreshf,
-	})
-}
-
 // Run implements the Discoverer interface.
 func (d *discoverer) Run(ctx context.Context, ch chan<- []*targetgroup.Group) {
 	// Get an initial set right away.
@@ -134,16 +126,4 @@ func (d *discoverer) refresh(ctx context.Context) ([]*targetgroup.Group, error) 
 		d.failures.Inc()
 	}
 	return tgs, err
-}
-
-// TODO(abursavich): CLEANUP: remove refresher and NewDiscovery once they are unused
-
-type refresher struct {
-	name    string
-	refresh func(ctx context.Context) ([]*targetgroup.Group, error)
-}
-
-func (r *refresher) Name() string { return r.name }
-func (r *refresher) Refresh(ctx context.Context) ([]*targetgroup.Group, error) {
-	return r.refresh(ctx)
 }
