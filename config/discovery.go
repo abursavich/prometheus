@@ -24,6 +24,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/prometheus/prometheus/discovery/discoverer"
 	"github.com/prometheus/prometheus/discovery/targetgroup"
+	"gopkg.in/yaml.v2"
 )
 
 const (
@@ -134,7 +135,7 @@ func unmarshalWithDiscoveryConfigs(out interface{}, unmarshal func(interface{}) 
 
 	// unmarshal into dynamic value
 	if err := unmarshal(cfgPtr.Interface()); err != nil {
-		return err
+		return replaceYAMLTypeError(err, cfgTyp, outTyp)
 	}
 
 	// copy shared fields from dynamic value
@@ -181,7 +182,6 @@ func unmarshalWithDiscoveryConfigs(out interface{}, unmarshal func(interface{}) 
 }
 
 func marshalWithDiscoveryConfigs(cfg interface{}) (interface{}, error) {
-	// TODO(abursavich): write tests for marshal
 	cfgVal := reflect.ValueOf(cfg)
 	for cfgVal.Kind() == reflect.Ptr {
 		cfgVal = cfgVal.Elem()
@@ -223,4 +223,15 @@ func marshalWithDiscoveryConfigs(cfg interface{}) (interface{}, error) {
 	}
 
 	return outPtr.Interface(), nil
+}
+
+func replaceYAMLTypeError(err error, oldTyp, newTyp reflect.Type) error {
+	if e, ok := err.(*yaml.TypeError); ok {
+		oldStr := oldTyp.String()
+		newStr := newTyp.String()
+		for i, s := range e.Errors {
+			e.Errors[i] = strings.Replace(s, oldStr, newStr, -1)
+		}
+	}
+	return err
 }
