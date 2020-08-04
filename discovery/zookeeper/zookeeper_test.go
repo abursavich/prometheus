@@ -26,7 +26,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestNewDiscoveryError(t *testing.T) {
-	_, err := NewDiscovery(
+	_, err := newDiscoverer(
 		[]string{"unreachable.test"},
 		time.Second, []string{"/"},
 		nil,

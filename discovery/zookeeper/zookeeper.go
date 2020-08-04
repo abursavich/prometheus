@@ -62,7 +62,7 @@ func (*ServersetConfig) Name() string { return "serverset" }
 
 // NewDiscoverer returns a Discoverer for the Config.
 func (c *ServersetConfig) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
-	return NewServersetDiscovery(c, opts.Logger)
+	return newDiscoverer(c.Servers, time.Duration(c.Timeout), c.Paths, opts.Logger, parseServersetMember)
 }
 
 // SetOptions applies the options to the Config.
@@ -105,7 +105,7 @@ func (*NerveConfig) Name() string { return "nerve" }
 
 // NewDiscoverer returns a Discoverer for the Config.
 func (c *NerveConfig) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
-	return NewNerveDiscovery(c, opts.Logger)
+	return newDiscoverer(c.Servers, time.Duration(c.Timeout), c.Paths, opts.Logger, parseNerveMember)
 }
 
 // SetOptions applies the options to the Config.
@@ -136,9 +136,9 @@ func (c *NerveConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return nil
 }
 
-// Discovery implements the Discoverer interface for discovering
+// discoverer implements the Discoverer interface for discovering
 // targets from Zookeeper.
-type Discovery struct {
+type discoverer struct {
 	conn *zk.Conn
 
 	sources map[string]*targetgroup.Group
@@ -151,25 +151,15 @@ type Discovery struct {
 	logger log.Logger
 }
 
-// NewNerveDiscovery returns a new Discovery for the given Nerve config.
-func NewNerveDiscovery(conf *NerveConfig, logger log.Logger) (*Discovery, error) {
-	return NewDiscovery(conf.Servers, time.Duration(conf.Timeout), conf.Paths, logger, parseNerveMember)
-}
-
-// NewServersetDiscovery returns a new Discovery for the given serverset config.
-func NewServersetDiscovery(conf *ServersetConfig, logger log.Logger) (*Discovery, error) {
-	return NewDiscovery(conf.Servers, time.Duration(conf.Timeout), conf.Paths, logger, parseServersetMember)
-}
-
-// NewDiscovery returns a new discovery along Zookeeper parses with
+// newDiscovery returns a new discovery along Zookeeper parses with
 // the given parse function.
-func NewDiscovery(
+func newDiscoverer(
 	srvs []string,
 	timeout time.Duration,
 	paths []string,
 	logger log.Logger,
 	pf func(data []byte, path string) (model.LabelSet, error),
-) (*Discovery, error) {
+) (*discoverer, error) {
 	if logger == nil {
 		logger = log.NewNopLogger()
 	}
@@ -183,7 +173,7 @@ func NewDiscovery(
 		return nil, err
 	}
 	updates := make(chan treecache.ZookeeperTreeCacheEvent)
-	sd := &Discovery{
+	sd := &discoverer{
 		conn:    conn,
 		updates: updates,
 		sources: map[string]*targetgroup.Group{},
@@ -199,7 +189,7 @@ func NewDiscovery(
 }
 
 // Run implements the Discoverer interface.
-func (d *Discovery) Run(ctx context.Context, ch chan<- []*targetgroup.Group) {
+func (d *discoverer) Run(ctx context.Context, ch chan<- []*targetgroup.Group) {
 	defer func() {
 		for _, tc := range d.treeCaches {
 			tc.Stop()
