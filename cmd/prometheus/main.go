@@ -53,7 +53,6 @@ import (
 	promlogflag "github.com/prometheus/common/promlog/flag"
 	"github.com/prometheus/prometheus/config"
 	"github.com/prometheus/prometheus/discovery"
-	"github.com/prometheus/prometheus/discovery/discoverer"
 	"github.com/prometheus/prometheus/notifier"
 	"github.com/prometheus/prometheus/pkg/labels"
 	"github.com/prometheus/prometheus/pkg/logging"
@@ -459,7 +458,7 @@ func main() {
 		// they need to read the most updated config when receiving the new targets list.
 		scrapeManager.ApplyConfig,
 		func(cfg *config.Config) error {
-			c := make(map[string][]discoverer.Config)
+			c := make(map[string][]discovery.Config)
 			for _, v := range cfg.ScrapeConfigs {
 				c[v.JobName] = v.ServiceDiscoveryConfigs
 			}
@@ -467,7 +466,7 @@ func main() {
 		},
 		notifierManager.ApplyConfig,
 		func(cfg *config.Config) error {
-			c := make(map[string][]discoverer.Config)
+			c := make(map[string][]discovery.Config)
 			for k, v := range cfg.AlertingConfig.AlertmanagerConfigs.ToMap() {
 				c[k] = v.ServiceDiscoveryConfigs
 			}
