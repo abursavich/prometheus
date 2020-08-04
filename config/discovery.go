@@ -22,7 +22,7 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
-	"github.com/prometheus/prometheus/discovery/discoverer"
+	"github.com/prometheus/prometheus/discovery"
 	"github.com/prometheus/prometheus/discovery/targetgroup"
 	"gopkg.in/yaml.v2"
 )
@@ -34,18 +34,18 @@ const (
 )
 
 var (
-	configNames      = make(map[string]discoverer.Config)
+	configNames      = make(map[string]discovery.Config)
 	configFieldNames = make(map[reflect.Type]string)
 	configFields     []reflect.StructField
 	configTypes      sync.Map // map[reflect.Type]reflect.Type
 
 	emptyStructType = reflect.TypeOf(struct{}{})
-	configSliceType = reflect.TypeOf([]discoverer.Config{})
+	configSliceType = reflect.TypeOf([]discovery.Config{})
 )
 
 // RegisterServiceDiscovery registers the given Config type along with the YAML key for the
 // list of its type in the Configs object.
-func RegisterServiceDiscovery(config discoverer.Config) {
+func RegisterServiceDiscovery(config discovery.Config) {
 	registerServiceDiscovery(config.Name()+"_sd_configs", reflect.TypeOf(config), config)
 }
 
@@ -53,10 +53,10 @@ func init() {
 	// N.B.: static_configs is the only Config type implemented by default.
 	// All other types are registered at init by their implementing packages.
 	elemTyp := reflect.TypeOf(&targetgroup.Group{})
-	registerServiceDiscovery(staticConfigsKey, elemTyp, discoverer.StaticConfig{})
+	registerServiceDiscovery(staticConfigsKey, elemTyp, discovery.StaticConfig{})
 }
 
-func registerServiceDiscovery(yamlKey string, elemType reflect.Type, config discoverer.Config) {
+func registerServiceDiscovery(yamlKey string, elemType reflect.Type, config discovery.Config) {
 	name := config.Name()
 	if _, ok := configNames[name]; ok {
 		panic(fmt.Sprintf("config: service discovery config named %q is already registered", name))
@@ -119,10 +119,10 @@ func unmarshalWithDiscoveryConfigs(out interface{}, unmarshal func(interface{}) 
 	cfgVal := cfgPtr.Elem()
 
 	// copy shared fields (defaults) to dynamic value
-	var configs *[]discoverer.Config
+	var configs *[]discovery.Config
 	for i := 0; i < outVal.NumField(); i++ {
 		if outTyp.Field(i).Type == configSliceType {
-			configs = outVal.Field(i).Addr().Interface().(*[]discoverer.Config)
+			configs = outVal.Field(i).Addr().Interface().(*[]discovery.Config)
 			continue
 		}
 		if cfgTyp.Field(i).PkgPath != "" {
@@ -147,7 +147,7 @@ func unmarshalWithDiscoveryConfigs(out interface{}, unmarshal func(interface{}) 
 		outVal.Field(i).Set(cfgVal.Field(i))
 	}
 
-	// collect dynamic discoverer.Config values
+	// collect dynamic discovery.Config values
 	var targets []*targetgroup.Group
 	for i := outVal.NumField(); i < cfgVal.NumField(); i++ {
 		field := cfgVal.Field(i)
@@ -168,16 +168,16 @@ func unmarshalWithDiscoveryConfigs(out interface{}, unmarshal func(interface{}) 
 				c.Source = strconv.Itoa(len(targets))
 				// coalesce multiple static configs into a single static config
 				targets = append(targets, c)
-			case discoverer.Config:
+			case discovery.Config:
 				*configs = append(*configs, c)
 			default:
-				panic("config: internal error: slice element is not a discoverer.Config")
+				panic("config: internal error: slice element is not a discovery.Config")
 			}
 
 		}
 	}
 	if len(targets) > 0 {
-		*configs = append(*configs, discoverer.StaticConfig(targets))
+		*configs = append(*configs, discovery.StaticConfig(targets))
 	}
 	return nil
 }
@@ -194,10 +194,10 @@ func marshalWithDiscoveryConfigs(cfg interface{}) (interface{}, error) {
 	outVal := outPtr.Elem()
 
 	// copy shared fields to dynamic value
-	var configs *[]discoverer.Config
+	var configs *[]discovery.Config
 	for i := 0; i < cfgVal.NumField(); i++ {
 		if cfgTyp.Field(i).Type == configSliceType {
-			configs = cfgVal.Field(i).Addr().Interface().(*[]discoverer.Config)
+			configs = cfgVal.Field(i).Addr().Interface().(*[]discovery.Config)
 		}
 		if outTyp.Field(i).PkgPath != "" {
 			continue // field is unexported: ignore
@@ -208,10 +208,10 @@ func marshalWithDiscoveryConfigs(cfg interface{}) (interface{}, error) {
 		panic("config: internal error: service discovery configs field not found")
 	}
 
-	// collect dynamic discoverer.Config values
+	// collect dynamic discovery.Config values
 	targets := outVal.FieldByName(staticConfigsFieldName).Addr().Interface().(*[]*targetgroup.Group)
 	for _, c := range *configs {
-		if sc, ok := c.(discoverer.StaticConfig); ok {
+		if sc, ok := c.(discovery.StaticConfig); ok {
 			*targets = append(*targets, sc...)
 			continue
 		}

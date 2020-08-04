@@ -34,7 +34,7 @@ import (
 	yaml "gopkg.in/yaml.v2"
 
 	"github.com/prometheus/prometheus/config"
-	"github.com/prometheus/prometheus/discovery/discoverer"
+	"github.com/prometheus/prometheus/discovery"
 	"github.com/prometheus/prometheus/discovery/targetgroup"
 )
 
@@ -61,12 +61,12 @@ type SDConfig struct {
 func (*SDConfig) Name() string { return "file" }
 
 // NewDiscoverer returns a Discoverer for the Config.
-func (c *SDConfig) NewDiscoverer(opts discoverer.Options) (discoverer.Discoverer, error) {
+func (c *SDConfig) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
 	return NewDiscovery(c, opts.Logger), nil
 }
 
 // SetOptions applies the options to the Config.
-func (c *SDConfig) SetOptions(opts discoverer.ConfigOptions) {
+func (c *SDConfig) SetOptions(opts discovery.ConfigOptions) {
 	for i, file := range c.Files {
 		c.Files[i] = config.JoinDir(opts.Directory, file)
 	}
