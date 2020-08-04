@@ -28,7 +28,7 @@ import (
 	"github.com/samuel/go-zookeeper/zk"
 
 	"github.com/prometheus/prometheus/config"
-	"github.com/prometheus/prometheus/discovery/discoverer"
+	"github.com/prometheus/prometheus/discovery"
 	"github.com/prometheus/prometheus/discovery/targetgroup"
 	"github.com/prometheus/prometheus/util/strutil"
 	"github.com/prometheus/prometheus/util/treecache"
@@ -61,12 +61,12 @@ type ServersetSDConfig struct {
 func (*ServersetSDConfig) Name() string { return "serverset" }
 
 // NewDiscoverer returns a Discoverer for the Config.
-func (c *ServersetSDConfig) NewDiscoverer(opts discoverer.Options) (discoverer.Discoverer, error) {
+func (c *ServersetSDConfig) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
 	return NewServersetDiscovery(c, opts.Logger)
 }
 
 // SetOptions applies the options to the Config.
-func (c *ServersetSDConfig) SetOptions(opts discoverer.ConfigOptions) {}
+func (c *ServersetSDConfig) SetOptions(opts discovery.ConfigOptions) {}
 
 // Validate checks the Config for errors.
 func (*ServersetSDConfig) Validate() error { return nil }
@@ -104,12 +104,12 @@ type NerveSDConfig struct {
 func (*NerveSDConfig) Name() string { return "nerve" }
 
 // NewDiscoverer returns a Discoverer for the Config.
-func (c *NerveSDConfig) NewDiscoverer(opts discoverer.Options) (discoverer.Discoverer, error) {
+func (c *NerveSDConfig) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
 	return NewNerveDiscovery(c, opts.Logger)
 }
 
 // SetOptions applies the options to the Config.
-func (c *NerveSDConfig) SetOptions(opts discoverer.ConfigOptions) {}
+func (c *NerveSDConfig) SetOptions(opts discovery.ConfigOptions) {}
 
 // Validate checks the Config for errors.
 func (*NerveSDConfig) Validate() error { return nil }

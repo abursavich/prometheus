@@ -32,7 +32,7 @@ import (
 	"github.com/prometheus/common/model"
 
 	"github.com/prometheus/prometheus/config"
-	"github.com/prometheus/prometheus/discovery/discoverer"
+	"github.com/prometheus/prometheus/discovery"
 	"github.com/prometheus/prometheus/discovery/refresh"
 	"github.com/prometheus/prometheus/discovery/targetgroup"
 	"github.com/prometheus/prometheus/util/strutil"
@@ -93,12 +93,12 @@ type SDConfig struct {
 func (*SDConfig) Name() string { return "ec2" }
 
 // NewDiscoverer returns a Discoverer for the Config.
-func (c *SDConfig) NewDiscoverer(opts discoverer.Options) (discoverer.Discoverer, error) {
+func (c *SDConfig) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
 	return NewDiscovery(c, opts.Logger), nil
 }
 
 // SetOptions applies the options to the Config.
-func (c *SDConfig) SetOptions(opts discoverer.ConfigOptions) {}
+func (c *SDConfig) SetOptions(opts discovery.ConfigOptions) {}
 
 // Validate checks the Config for errors.
 func (*SDConfig) Validate() error { return nil }
