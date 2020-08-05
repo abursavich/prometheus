@@ -11,7 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package config
+package discovery
 
 import (
 	"fmt"
@@ -21,45 +21,44 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/pkg/errors"
-	"github.com/prometheus/prometheus/discovery"
 	"github.com/prometheus/prometheus/discovery/targetgroup"
 	"gopkg.in/yaml.v2"
 )
 
 const (
-	configFieldPrefix      = "AUTO_"
+	configFieldPrefix      = "AUTO_DISCOVERY_"
 	staticConfigsKey       = "static_configs"
 	staticConfigsFieldName = configFieldPrefix + staticConfigsKey
 )
 
 var (
-	configNames      = make(map[string]discovery.Config)
+	configNames      = make(map[string]Config)
 	configFieldNames = make(map[reflect.Type]string)
 	configFields     []reflect.StructField
-	configTypes      sync.Map // map[reflect.Type]reflect.Type
+
+	configTypesMu sync.Mutex
+	configTypes   = make(map[reflect.Type]reflect.Type)
 
 	emptyStructType = reflect.TypeOf(struct{}{})
-	configSliceType = reflect.TypeOf([]discovery.Config{})
+	configsType     = reflect.TypeOf(Configs{})
 )
 
-// RegisterServiceDiscovery registers the given Config type along with the YAML key for the
-// list of its type in the Configs object.
-func RegisterServiceDiscovery(config discovery.Config) {
-	registerServiceDiscovery(config.Name()+"_sd_configs", reflect.TypeOf(config), config)
+// RegisterConfig registers the given Config type for YAML marshaling and unmarshaling.
+func RegisterConfig(config Config) {
+	registerConfig(config.Name()+"_sd_configs", reflect.TypeOf(config), config)
 }
 
 func init() {
 	// N.B.: static_configs is the only Config type implemented by default.
 	// All other types are registered at init by their implementing packages.
 	elemTyp := reflect.TypeOf(&targetgroup.Group{})
-	registerServiceDiscovery(staticConfigsKey, elemTyp, discovery.StaticConfig{})
+	registerConfig(staticConfigsKey, elemTyp, StaticConfig{})
 }
 
-func registerServiceDiscovery(yamlKey string, elemType reflect.Type, config discovery.Config) {
+func registerConfig(yamlKey string, elemType reflect.Type, config Config) {
 	name := config.Name()
 	if _, ok := configNames[name]; ok {
-		panic(fmt.Sprintf("config: service discovery config named %q is already registered", name))
+		panic(fmt.Sprintf("discovery: Config named %q is already registered", name))
 	}
 	configNames[name] = config
 
@@ -80,14 +79,16 @@ func registerServiceDiscovery(yamlKey string, elemType reflect.Type, config disc
 }
 
 func getConfigType(out reflect.Type) reflect.Type {
-	if v, ok := configTypes.Load(out); ok {
-		return v.(reflect.Type)
+	configTypesMu.Lock()
+	defer configTypesMu.Unlock()
+	if typ, ok := configTypes[out]; ok {
+		return typ
 	}
 	// initial exported fields map one-to-one
 	var fields []reflect.StructField
 	for i := 0; i < out.NumField(); i++ {
 		switch field := out.Field(i); {
-		case field.PkgPath == "" && field.Type != configSliceType:
+		case field.PkgPath == "" && field.Type != configsType:
 			fields = append(fields, field)
 		default:
 			fields = append(fields, reflect.StructField{
@@ -99,18 +100,25 @@ func getConfigType(out reflect.Type) reflect.Type {
 	}
 	// append extra config fields on the end
 	fields = append(fields, configFields...)
-	typ, _ := configTypes.LoadOrStore(out, reflect.StructOf(fields))
-	return typ.(reflect.Type)
+	typ := reflect.StructOf(fields)
+	configTypes[out] = typ
+	return typ
 }
 
-func unmarshalWithDiscoveryConfigs(out interface{}, unmarshal func(interface{}) error) error {
+// UnmarshalYAMLWithInlineConfigs helps implement yaml.Unmarshal for structs
+// that have a Configs field that should be inlined.
+func UnmarshalYAMLWithInlineConfigs(out interface{}, unmarshal func(interface{}) error) error {
+	// This function can be removed if https://github.com/go-yaml/yaml/issues/642 is fixed.
+
 	outVal := reflect.ValueOf(out)
 	if outVal.Kind() != reflect.Ptr {
-		panic("config: internal error: can only unmarshal into a struct pointer")
+		// TODO: panic?
+		return fmt.Errorf("discovery: can only unmarshal into a struct pointer: %T", out)
 	}
 	outVal = outVal.Elem()
 	if outVal.Kind() != reflect.Struct {
-		panic("config: internal error: can only unmarshal into a struct pointer")
+		// TODO: panic?
+		return fmt.Errorf("discovery: can only unmarshal into a struct pointer: %T", out)
 	}
 	outTyp := outVal.Type()
 
@@ -119,10 +127,10 @@ func unmarshalWithDiscoveryConfigs(out interface{}, unmarshal func(interface{}) 
 	cfgVal := cfgPtr.Elem()
 
 	// copy shared fields (defaults) to dynamic value
-	var configs *[]discovery.Config
+	var configs *Configs
 	for i := 0; i < outVal.NumField(); i++ {
-		if outTyp.Field(i).Type == configSliceType {
-			configs = outVal.Field(i).Addr().Interface().(*[]discovery.Config)
+		if outTyp.Field(i).Type == configsType {
+			configs = outVal.Field(i).Addr().Interface().(*Configs)
 			continue
 		}
 		if cfgTyp.Field(i).PkgPath != "" {
@@ -131,7 +139,8 @@ func unmarshalWithDiscoveryConfigs(out interface{}, unmarshal func(interface{}) 
 		cfgVal.Field(i).Set(outVal.Field(i))
 	}
 	if configs == nil {
-		panic("config: internal error: service discovery configs field not found")
+		// TODO: panic?
+		return fmt.Errorf("discovery: Configs field not found in type: %T", out)
 	}
 
 	// unmarshal into dynamic value
@@ -147,19 +156,27 @@ func unmarshalWithDiscoveryConfigs(out interface{}, unmarshal func(interface{}) 
 		outVal.Field(i).Set(cfgVal.Field(i))
 	}
 
-	// collect dynamic discovery.Config values
-	var targets []*targetgroup.Group
-	for i := outVal.NumField(); i < cfgVal.NumField(); i++ {
-		field := cfgVal.Field(i)
+	var err error
+	*configs, err = readConfigs(cfgVal, outVal.NumField())
+	return err
+}
+
+func readConfigs(structVal reflect.Value, startField int) (Configs, error) {
+	var (
+		configs Configs
+		targets []*targetgroup.Group
+	)
+	for i := startField; i < structVal.NumField(); i++ {
+		field := structVal.Field(i)
 		if field.Kind() != reflect.Slice {
-			panic("config: internal error: field is not a slice")
+			panic("discovery: internal error: field is not a slice")
 		}
 		for k := 0; k < field.Len(); k++ {
 			val := field.Index(k)
 			if val.IsZero() || (val.Kind() == reflect.Ptr && val.Elem().IsZero()) {
 				key := configFieldNames[field.Type().Elem()]
 				key = strings.TrimPrefix(key, configFieldPrefix)
-				return errors.New("empty or null section in " + key)
+				return nil, fmt.Errorf("empty or null section in %s", key)
 			}
 			switch c := val.Interface().(type) {
 			case *targetgroup.Group:
@@ -168,62 +185,72 @@ func unmarshalWithDiscoveryConfigs(out interface{}, unmarshal func(interface{}) 
 				c.Source = strconv.Itoa(len(targets))
 				// coalesce multiple static configs into a single static config
 				targets = append(targets, c)
-			case discovery.Config:
-				*configs = append(*configs, c)
+			case Config:
+				configs = append(configs, c)
 			default:
-				panic("config: internal error: slice element is not a discovery.Config")
+				panic("discovery: internal error: slice element is not a Config")
 			}
-
 		}
 	}
 	if len(targets) > 0 {
-		*configs = append(*configs, discovery.StaticConfig(targets))
+		configs = append(configs, StaticConfig(targets))
 	}
-	return nil
+	return configs, nil
 }
 
-func marshalWithDiscoveryConfigs(cfg interface{}) (interface{}, error) {
-	cfgVal := reflect.ValueOf(cfg)
-	for cfgVal.Kind() == reflect.Ptr {
-		cfgVal = cfgVal.Elem()
-	}
-	cfgTyp := cfgVal.Type()
+// MarshalYAMLWithInlineConfigs helps implement yaml.Marshal for structs
+// that have a Configs field that should be inlined.
+func MarshalYAMLWithInlineConfigs(in interface{}) (interface{}, error) {
+	// This function can be removed if https://github.com/go-yaml/yaml/issues/642 is fixed.
 
-	outTyp := getConfigType(cfgTyp)
-	outPtr := reflect.New(outTyp)
-	outVal := outPtr.Elem()
+	inVal := reflect.ValueOf(in)
+	for inVal.Kind() == reflect.Ptr {
+		inVal = inVal.Elem()
+	}
+	inType := inVal.Type()
+
+	cfgTyp := getConfigType(inType)
+	cfgPtr := reflect.New(cfgTyp)
+	cfgVal := cfgPtr.Elem()
 
 	// copy shared fields to dynamic value
-	var configs *[]discovery.Config
-	for i := 0; i < cfgVal.NumField(); i++ {
-		if cfgTyp.Field(i).Type == configSliceType {
-			configs = cfgVal.Field(i).Addr().Interface().(*[]discovery.Config)
+	var configs *Configs
+	for i := 0; i < inVal.NumField(); i++ {
+		if inType.Field(i).Type == configsType {
+			configs = inVal.Field(i).Addr().Interface().(*Configs)
 		}
-		if outTyp.Field(i).PkgPath != "" {
+		if cfgTyp.Field(i).PkgPath != "" {
 			continue // field is unexported: ignore
 		}
-		outVal.Field(i).Set(cfgVal.Field(i))
+		cfgVal.Field(i).Set(inVal.Field(i))
 	}
 	if configs == nil {
-		panic("config: internal error: service discovery configs field not found")
+		// TODO: panic?
+		return nil, fmt.Errorf("discovery: Configs field not found in type: %T", in)
 	}
 
-	// collect dynamic discovery.Config values
-	targets := outVal.FieldByName(staticConfigsFieldName).Addr().Interface().(*[]*targetgroup.Group)
-	for _, c := range *configs {
-		if sc, ok := c.(discovery.StaticConfig); ok {
+	if err := writeConfigs(cfgVal, *configs); err != nil {
+		return nil, err
+	}
+
+	return cfgPtr.Interface(), nil
+}
+
+func writeConfigs(structVal reflect.Value, configs Configs) error {
+	targets := structVal.FieldByName(staticConfigsFieldName).Addr().Interface().(*[]*targetgroup.Group)
+	for _, c := range configs {
+		if sc, ok := c.(StaticConfig); ok {
 			*targets = append(*targets, sc...)
 			continue
 		}
 		fieldName, ok := configFieldNames[reflect.TypeOf(c)]
 		if !ok {
-			return nil, errors.Errorf("cannot marshal unregistered Config type: %T", c)
+			return fmt.Errorf("discovery: cannot marshal unregistered Config type: %T", c)
 		}
-		field := outVal.FieldByName(fieldName)
+		field := structVal.FieldByName(fieldName)
 		field.Set(reflect.Append(field, reflect.ValueOf(c)))
 	}
-
-	return outPtr.Interface(), nil
+	return nil
 }
 
 func replaceYAMLTypeError(err error, oldTyp, newTyp reflect.Type) error {

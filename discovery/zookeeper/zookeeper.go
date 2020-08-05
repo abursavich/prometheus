@@ -27,7 +27,6 @@ import (
 	"github.com/prometheus/common/model"
 	"github.com/samuel/go-zookeeper/zk"
 
-	"github.com/prometheus/prometheus/config"
 	"github.com/prometheus/prometheus/discovery"
 	"github.com/prometheus/prometheus/discovery/targetgroup"
 	"github.com/prometheus/prometheus/util/strutil"
@@ -46,8 +45,8 @@ var (
 )
 
 func init() {
-	config.RegisterServiceDiscovery(&ServersetSDConfig{})
-	config.RegisterServiceDiscovery(&NerveSDConfig{})
+	discovery.RegisterConfig(&ServersetSDConfig{})
+	discovery.RegisterConfig(&NerveSDConfig{})
 }
 
 // ServersetSDConfig is the configuration for Twitter serversets in Zookeeper based discovery.
@@ -67,9 +66,6 @@ func (c *ServersetSDConfig) NewDiscoverer(opts discovery.DiscovererOptions) (dis
 
 // SetOptions applies the options to the Config.
 func (c *ServersetSDConfig) SetOptions(opts discovery.ConfigOptions) {}
-
-// Validate checks the Config for errors.
-func (*ServersetSDConfig) Validate() error { return nil }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
 func (c *ServersetSDConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
@@ -110,9 +106,6 @@ func (c *NerveSDConfig) NewDiscoverer(opts discovery.DiscovererOptions) (discove
 
 // SetOptions applies the options to the Config.
 func (c *NerveSDConfig) SetOptions(opts discovery.ConfigOptions) {}
-
-// Validate checks the Config for errors.
-func (*NerveSDConfig) Validate() error { return nil }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
 func (c *NerveSDConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {

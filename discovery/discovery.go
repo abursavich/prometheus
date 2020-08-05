@@ -15,6 +15,7 @@ package discovery
 
 import (
 	"context"
+	"reflect"
 
 	"github.com/go-kit/kit/log"
 
@@ -61,6 +62,38 @@ type Config interface {
 	SetOptions(ConfigOptions)
 }
 
+// Configs is a slice of Config values that uses custom YAML marshaling and unmarshaling
+// to represent itself as a mapping of the Config values grouped by their types.
+type Configs []Config
+
+// UnmarshalYAML implements yaml.Unmarshaler.
+func (c *Configs) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	cfgTyp := getConfigType(configsType)
+	cfgPtr := reflect.New(cfgTyp)
+	cfgVal := cfgPtr.Elem()
+
+	if err := unmarshal(cfgPtr.Interface()); err != nil {
+		return replaceYAMLTypeError(err, cfgTyp, configsType)
+	}
+
+	var err error
+	*c, err = readConfigs(cfgVal, 0)
+	return err
+}
+
+// MarshalYAML implements yaml.Marshaler.
+func (c Configs) MarshalYAML() (interface{}, error) {
+	cfgTyp := getConfigType(configsType)
+	cfgPtr := reflect.New(cfgTyp)
+	cfgVal := cfgPtr.Elem()
+
+	if err := writeConfigs(cfgVal, c); err != nil {
+		return nil, err
+	}
+
+	return cfgPtr.Interface(), nil
+}
+
 // A StaticConfig is a Config that provides a static list of targets.
 type StaticConfig []*targetgroup.Group
 
@@ -74,9 +107,6 @@ func (c StaticConfig) NewDiscoverer(DiscovererOptions) (Discoverer, error) {
 
 // SetOptions applies the options to the Config.
 func (StaticConfig) SetOptions(options ConfigOptions) {}
-
-// Validate checks the Config for errors.
-func (StaticConfig) Validate() error { return nil }
 
 type staticDiscoverer []*targetgroup.Group
 

@@ -18,7 +18,6 @@ import (
 	"io/ioutil"
 	"net/url"
 	"path/filepath"
-	"reflect"
 	"regexp"
 	"strings"
 	"time"
@@ -184,7 +183,7 @@ func (c *Config) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	// again, we have to hide it using a type indirection.
 	type plain Config
 	if err := unmarshal((*plain)(c)); err != nil {
-		return replaceYAMLTypeError(err, reflect.TypeOf(plain{}), reflect.TypeOf(*c))
+		return err
 	}
 
 	// If a global block was open but empty the default global config is overwritten.
@@ -272,7 +271,7 @@ func (c *GlobalConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	gc := &GlobalConfig{}
 	type plain GlobalConfig
 	if err := unmarshal((*plain)(gc)); err != nil {
-		return replaceYAMLTypeError(err, reflect.TypeOf(plain{}), reflect.TypeOf(*c))
+		return err
 	}
 
 	for _, l := range gc.ExternalLabels {
@@ -342,7 +341,7 @@ type ScrapeConfig struct {
 	// We cannot do proper Go type embedding below as the parser will then parse
 	// values arbitrarily into the overflow maps of further-down types.
 
-	ServiceDiscoveryConfigs []discovery.Config           `yaml:"-"`
+	ServiceDiscoveryConfigs discovery.Configs            `yaml:"-"`
 	HTTPClientConfig        config_util.HTTPClientConfig `yaml:",inline"`
 
 	// List of target relabel configurations.
@@ -354,7 +353,7 @@ type ScrapeConfig struct {
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
 func (c *ScrapeConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	*c = DefaultScrapeConfig
-	if err := unmarshalWithDiscoveryConfigs(c, unmarshal); err != nil {
+	if err := discovery.UnmarshalYAMLWithInlineConfigs(c, unmarshal); err != nil {
 		return err
 	}
 	if len(c.JobName) == 0 {
@@ -391,7 +390,7 @@ func (c *ScrapeConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 
 // MarshalYAML implements the yaml.Marshaler interface.
 func (c *ScrapeConfig) MarshalYAML() (interface{}, error) {
-	return marshalWithDiscoveryConfigs(c)
+	return discovery.MarshalYAMLWithInlineConfigs(c)
 }
 
 // AlertingConfig configures alerting and alertmanager related configs.
@@ -407,7 +406,7 @@ func (c *AlertingConfig) UnmarshalYAML(unmarshal func(interface{}) error) error 
 	*c = AlertingConfig{}
 	type plain AlertingConfig
 	if err := unmarshal((*plain)(c)); err != nil {
-		return replaceYAMLTypeError(err, reflect.TypeOf(plain{}), reflect.TypeOf(*c))
+		return err
 	}
 
 	for _, rlcfg := range c.AlertRelabelConfigs {
@@ -439,7 +438,7 @@ func (v *AlertmanagerAPIVersion) UnmarshalYAML(unmarshal func(interface{}) error
 	*v = AlertmanagerAPIVersion("")
 	type plain AlertmanagerAPIVersion
 	if err := unmarshal((*plain)(v)); err != nil {
-		return replaceYAMLTypeError(err, reflect.TypeOf(plain("")), reflect.TypeOf(*v))
+		return err
 	}
 
 	for _, supportedVersion := range SupportedAlertmanagerAPIVersions {
@@ -469,7 +468,7 @@ type AlertmanagerConfig struct {
 	// We cannot do proper Go type embedding below as the parser will then parse
 	// values arbitrarily into the overflow maps of further-down types.
 
-	ServiceDiscoveryConfigs []discovery.Config           `yaml:"-"`
+	ServiceDiscoveryConfigs discovery.Configs            `yaml:"-"`
 	HTTPClientConfig        config_util.HTTPClientConfig `yaml:",inline"`
 
 	// The URL scheme to use when talking to Alertmanagers.
@@ -489,7 +488,7 @@ type AlertmanagerConfig struct {
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
 func (c *AlertmanagerConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	*c = DefaultAlertmanagerConfig
-	if err := unmarshalWithDiscoveryConfigs(c, unmarshal); err != nil {
+	if err := discovery.UnmarshalYAMLWithInlineConfigs(c, unmarshal); err != nil {
 		return err
 	}
 
@@ -518,10 +517,10 @@ func (c *AlertmanagerConfig) UnmarshalYAML(unmarshal func(interface{}) error) er
 
 // MarshalYAML implements the yaml.Marshaler interface.
 func (c *AlertmanagerConfig) MarshalYAML() (interface{}, error) {
-	return marshalWithDiscoveryConfigs(c)
+	return discovery.MarshalYAMLWithInlineConfigs(c)
 }
 
-func checkStaticTargets(configs []discovery.Config) error {
+func checkStaticTargets(configs discovery.Configs) error {
 	for _, cfg := range configs {
 		sc, ok := cfg.(discovery.StaticConfig)
 		if !ok {
@@ -565,7 +564,7 @@ func (c *RemoteWriteConfig) UnmarshalYAML(unmarshal func(interface{}) error) err
 	*c = DefaultRemoteWriteConfig
 	type plain RemoteWriteConfig
 	if err := unmarshal((*plain)(c)); err != nil {
-		return replaceYAMLTypeError(err, reflect.TypeOf(plain{}), reflect.TypeOf(*c))
+		return err
 	}
 	if c.URL == nil {
 		return errors.New("url for remote_write is empty")
@@ -627,7 +626,7 @@ func (c *RemoteReadConfig) UnmarshalYAML(unmarshal func(interface{}) error) erro
 	*c = DefaultRemoteReadConfig
 	type plain RemoteReadConfig
 	if err := unmarshal((*plain)(c)); err != nil {
-		return replaceYAMLTypeError(err, reflect.TypeOf(plain{}), reflect.TypeOf(*c))
+		return err
 	}
 	if c.URL == nil {
 		return errors.New("url for remote_read is empty")
