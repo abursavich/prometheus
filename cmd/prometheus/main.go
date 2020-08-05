@@ -467,7 +467,7 @@ func main() {
 		}, {
 			name: "scrape_sd",
 			reloader: func(cfg *config.Config) error {
-				c := make(map[string][]discovery.Config)
+				c := make(map[string]discovery.Configs)
 				for _, v := range cfg.ScrapeConfigs {
 					c[v.JobName] = v.ServiceDiscoveryConfigs
 				}
@@ -479,7 +479,7 @@ func main() {
 		}, {
 			name: "notify_sd",
 			reloader: func(cfg *config.Config) error {
-				c := make(map[string][]discovery.Config)
+				c := make(map[string]discovery.Configs)
 				for k, v := range cfg.AlertingConfig.AlertmanagerConfigs.ToMap() {
 					c[k] = v.ServiceDiscoveryConfigs
 				}

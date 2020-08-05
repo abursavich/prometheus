@@ -765,8 +765,8 @@ func TestTargetSetRecreatesTargetGroupsEveryRun(t *testing.T) {
 	discoveryManager.updatert = 100 * time.Millisecond
 	go discoveryManager.Run()
 
-	c := map[string][]Config{
-		"prometheus": []Config{
+	c := map[string]Configs{
+		"prometheus": {
 			staticConfig("foo:9090", "bar:9090"),
 		},
 	}
@@ -776,7 +776,7 @@ func TestTargetSetRecreatesTargetGroupsEveryRun(t *testing.T) {
 	verifyPresence(t, discoveryManager.targets, poolKey{setName: "prometheus", provider: "static/0"}, "{__address__=\"foo:9090\"}", true)
 	verifyPresence(t, discoveryManager.targets, poolKey{setName: "prometheus", provider: "static/0"}, "{__address__=\"bar:9090\"}", true)
 
-	c["prometheus"] = []Config{
+	c["prometheus"] = Configs{
 		staticConfig("foo:9090"),
 	}
 	discoveryManager.ApplyConfig(c)
@@ -793,8 +793,8 @@ func TestDiscovererConfigs(t *testing.T) {
 	discoveryManager.updatert = 100 * time.Millisecond
 	go discoveryManager.Run()
 
-	c := map[string][]Config{
-		"prometheus": []Config{
+	c := map[string]Configs{
+		"prometheus": {
 			staticConfig("foo:9090", "bar:9090"),
 			staticConfig("baz:9090"),
 		},
@@ -817,8 +817,8 @@ func TestTargetSetRecreatesEmptyStaticConfigs(t *testing.T) {
 	discoveryManager.updatert = 100 * time.Millisecond
 	go discoveryManager.Run()
 
-	c := map[string][]Config{
-		"prometheus": []Config{
+	c := map[string]Configs{
+		"prometheus": {
 			staticConfig("foo:9090"),
 		},
 	}
@@ -827,7 +827,7 @@ func TestTargetSetRecreatesEmptyStaticConfigs(t *testing.T) {
 	<-discoveryManager.SyncCh()
 	verifyPresence(t, discoveryManager.targets, poolKey{setName: "prometheus", provider: "static/0"}, "{__address__=\"foo:9090\"}", true)
 
-	c["prometheus"] = []Config{
+	c["prometheus"] = Configs{
 		StaticConfig{{}},
 	}
 	discoveryManager.ApplyConfig(c)
@@ -856,7 +856,7 @@ func TestIdenticalConfigurationsAreCoalesced(t *testing.T) {
 	discoveryManager.updatert = 100 * time.Millisecond
 	go discoveryManager.Run()
 
-	c := map[string][]Config{
+	c := map[string]Configs{
 		"prometheus": {
 			staticConfig("foo:9090"),
 		},
@@ -875,10 +875,10 @@ func TestIdenticalConfigurationsAreCoalesced(t *testing.T) {
 }
 
 func TestApplyConfigDoesNotModifyStaticTargets(t *testing.T) {
-	originalConfig := []Config{
+	originalConfig := Configs{
 		staticConfig("foo:9090", "bar:9090", "baz:9090"),
 	}
-	processedConfig := []Config{
+	processedConfig := Configs{
 		staticConfig("foo:9090", "bar:9090", "baz:9090"),
 	}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -887,7 +887,7 @@ func TestApplyConfigDoesNotModifyStaticTargets(t *testing.T) {
 	discoveryManager.updatert = 100 * time.Millisecond
 	go discoveryManager.Run()
 
-	cfgs := map[string][]Config{
+	cfgs := map[string]Configs{
 		"prometheus": processedConfig,
 	}
 	discoveryManager.ApplyConfig(cfgs)
@@ -906,7 +906,6 @@ type errorConfig struct{ err error }
 func (e errorConfig) Name() string                                        { return "error" }
 func (e errorConfig) NewDiscoverer(DiscovererOptions) (Discoverer, error) { return nil, e.err }
 func (e errorConfig) SetOptions(ConfigOptions)                            {}
-func (e errorConfig) Validate() error                                     { return nil }
 
 func TestGaugeFailedConfigs(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -915,7 +914,7 @@ func TestGaugeFailedConfigs(t *testing.T) {
 	discoveryManager.updatert = 100 * time.Millisecond
 	go discoveryManager.Run()
 
-	c := map[string][]Config{
+	c := map[string]Configs{
 		"prometheus": {
 			errorConfig{fmt.Errorf("tests error 0")},
 			errorConfig{fmt.Errorf("tests error 1")},
@@ -930,7 +929,7 @@ func TestGaugeFailedConfigs(t *testing.T) {
 		t.Fatalf("Expected to have 3 failed configs, got: %v", failedCount)
 	}
 
-	c["prometheus"] = []Config{
+	c["prometheus"] = Configs{
 		staticConfig("foo:9090"),
 	}
 	discoveryManager.ApplyConfig(c)

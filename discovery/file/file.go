@@ -48,7 +48,7 @@ var (
 )
 
 func init() {
-	config.RegisterServiceDiscovery(&SDConfig{})
+	discovery.RegisterConfig(&SDConfig{})
 }
 
 // SDConfig is the configuration for file based discovery.
@@ -71,9 +71,6 @@ func (c *SDConfig) SetOptions(opts discovery.ConfigOptions) {
 		c.Files[i] = config.JoinDir(opts.Directory, file)
 	}
 }
-
-// Validate checks the Config for errors.
-func (*SDConfig) Validate() error { return nil }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
 func (c *SDConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {

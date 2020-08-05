@@ -41,7 +41,7 @@ var DefaultSDConfig = SDConfig{
 }
 
 func init() {
-	config.RegisterServiceDiscovery(&SDConfig{})
+	discovery.RegisterConfig(&SDConfig{})
 }
 
 // SDConfig is the configuration for OpenStack based service discovery.

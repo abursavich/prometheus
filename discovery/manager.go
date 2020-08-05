@@ -152,7 +152,7 @@ func (m *Manager) SyncCh() <-chan map[string][]*targetgroup.Group {
 }
 
 // ApplyConfig removes all running discovery providers and starts new ones using the provided config.
-func (m *Manager) ApplyConfig(cfg map[string][]Config) error {
+func (m *Manager) ApplyConfig(cfg map[string]Configs) error {
 	m.mtx.Lock()
 	defer m.mtx.Unlock()
 
@@ -293,7 +293,7 @@ func (m *Manager) allGroups() map[string][]*targetgroup.Group {
 }
 
 // registerProviders returns a number of failed SD config.
-func (m *Manager) registerProviders(cfgs []Config, setName string) int {
+func (m *Manager) registerProviders(cfgs Configs, setName string) int {
 	var (
 		failed int
 		added  bool

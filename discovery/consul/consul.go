@@ -102,7 +102,7 @@ var (
 )
 
 func init() {
-	config.RegisterServiceDiscovery(&SDConfig{})
+	discovery.RegisterConfig(&SDConfig{})
 	prometheus.MustRegister(rpcFailuresCount)
 	prometheus.MustRegister(rpcDuration)
 }

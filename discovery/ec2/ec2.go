@@ -31,7 +31,6 @@ import (
 	config_util "github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
 
-	"github.com/prometheus/prometheus/config"
 	"github.com/prometheus/prometheus/discovery"
 	"github.com/prometheus/prometheus/discovery/refresh"
 	"github.com/prometheus/prometheus/discovery/targetgroup"
@@ -67,7 +66,7 @@ var DefaultSDConfig = SDConfig{
 }
 
 func init() {
-	config.RegisterServiceDiscovery(&SDConfig{})
+	discovery.RegisterConfig(&SDConfig{})
 }
 
 // Filter is the configuration for filtering EC2 instances.
@@ -99,9 +98,6 @@ func (c *SDConfig) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Di
 
 // SetOptions applies the options to the Config.
 func (c *SDConfig) SetOptions(opts discovery.ConfigOptions) {}
-
-// Validate checks the Config for errors.
-func (*SDConfig) Validate() error { return nil }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
 func (c *SDConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {

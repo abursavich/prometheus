@@ -220,8 +220,7 @@ down the channel.
 
 Now that your service discovery mechanism is ready to discover targets, you must help
 Prometheus discover it. This is done by implementing the `discovery.Config` interface
-and registering it with `config.RegisterServiceDiscovery` in an init function of your
-package.
+and registering it with `discovery.RegisterConfig` in an init function of your package.
 
 ```go
 type Config interface {
@@ -234,9 +233,6 @@ type Config interface {
 
 	// SetOptions applies the ConfigOptions to the Config.
 	SetOptions(ConfigOptions)
-
-	// Validate checks the Config for errors.
-	Validate() error
 }
 
 type ConfigOptions struct {

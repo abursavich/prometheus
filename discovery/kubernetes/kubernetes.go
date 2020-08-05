@@ -70,7 +70,7 @@ var (
 )
 
 func init() {
-	config.RegisterServiceDiscovery(&SDConfig{})
+	discovery.RegisterConfig(&SDConfig{})
 	prometheus.MustRegister(eventCount)
 	// Initialize metric vectors.
 	for _, role := range []string{"endpointslice", "endpoints", "node", "pod", "service", "ingress"} {
