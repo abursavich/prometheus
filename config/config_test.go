@@ -19,11 +19,13 @@ import (
 	"net/url"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"testing"
 	"time"
 
-	config_util "github.com/prometheus/common/config"
+	"github.com/google/go-cmp/cmp"
+	"github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
 	"gopkg.in/yaml.v2"
 
@@ -48,12 +50,12 @@ import (
 	"github.com/prometheus/prometheus/util/testutil"
 )
 
-func mustParseURL(u string) *config_util.URL {
+func mustParseURL(u string) *config.URL {
 	parsed, err := url.Parse(u)
 	if err != nil {
 		panic(err)
 	}
-	return &config_util.URL{URL: parsed}
+	return &config.URL{URL: parsed}
 }
 
 var expectedConf = &Config{
@@ -95,8 +97,8 @@ var expectedConf = &Config{
 			RemoteTimeout: model.Duration(30 * time.Second),
 			QueueConfig:   DefaultQueueConfig,
 			Name:          "rw_tls",
-			HTTPClientConfig: config_util.HTTPClientConfig{
-				TLSConfig: config_util.TLSConfig{
+			HTTPClientConfig: config.HTTPClientConfig{
+				TLSConfig: config.TLSConfig{
 					CertFile: filepath.FromSlash("testdata/valid_cert_file"),
 					KeyFile:  filepath.FromSlash("testdata/valid_key_file"),
 				},
@@ -117,8 +119,8 @@ var expectedConf = &Config{
 			ReadRecent:       false,
 			Name:             "read_special",
 			RequiredMatchers: model.LabelSet{"job": "special"},
-			HTTPClientConfig: config_util.HTTPClientConfig{
-				TLSConfig: config_util.TLSConfig{
+			HTTPClientConfig: config.HTTPClientConfig{
+				TLSConfig: config.TLSConfig{
 					CertFile: filepath.FromSlash("testdata/valid_cert_file"),
 					KeyFile:  filepath.FromSlash("testdata/valid_key_file"),
 				},
@@ -138,7 +140,7 @@ var expectedConf = &Config{
 			MetricsPath: DefaultScrapeConfig.MetricsPath,
 			Scheme:      DefaultScrapeConfig.Scheme,
 
-			HTTPClientConfig: config_util.HTTPClientConfig{
+			HTTPClientConfig: config.HTTPClientConfig{
 				BearerTokenFile: filepath.FromSlash("testdata/valid_token_file"),
 			},
 
@@ -210,8 +212,8 @@ var expectedConf = &Config{
 			ScrapeTimeout:   model.Duration(5 * time.Second),
 			SampleLimit:     1000,
 
-			HTTPClientConfig: config_util.HTTPClientConfig{
-				BasicAuth: &config_util.BasicAuth{
+			HTTPClientConfig: config.HTTPClientConfig{
+				BasicAuth: &config.BasicAuth{
 					Username: "admin_name",
 					Password: "multiline\nmysecret\ntest",
 				},
@@ -314,7 +316,7 @@ var expectedConf = &Config{
 						Scheme:          "https",
 						RefreshInterval: consul.DefaultSDConfig.RefreshInterval,
 						AllowStale:      true,
-						TLSConfig: config_util.TLSConfig{
+						TLSConfig: config.TLSConfig{
 							CertFile:           filepath.FromSlash("testdata/valid_cert_file"),
 							KeyFile:            filepath.FromSlash("testdata/valid_key_file"),
 							CAFile:             filepath.FromSlash("testdata/valid_ca_file"),
@@ -345,8 +347,8 @@ var expectedConf = &Config{
 			MetricsPath: "/metrics",
 			Scheme:      "http",
 
-			HTTPClientConfig: config_util.HTTPClientConfig{
-				TLSConfig: config_util.TLSConfig{
+			HTTPClientConfig: config.HTTPClientConfig{
+				TLSConfig: config.TLSConfig{
 					CertFile: filepath.FromSlash("testdata/valid_cert_file"),
 					KeyFile:  filepath.FromSlash("testdata/valid_key_file"),
 				},
@@ -369,12 +371,12 @@ var expectedConf = &Config{
 					{
 						APIServer: kubernetesSDHostURL(),
 						Role:      kubernetes.RoleEndpoint,
-						HTTPClientConfig: config_util.HTTPClientConfig{
-							BasicAuth: &config_util.BasicAuth{
+						HTTPClientConfig: config.HTTPClientConfig{
+							BasicAuth: &config.BasicAuth{
 								Username: "myusername",
 								Password: "mysecret",
 							},
-							TLSConfig: config_util.TLSConfig{
+							TLSConfig: config.TLSConfig{
 								CertFile: filepath.FromSlash("testdata/valid_cert_file"),
 								KeyFile:  filepath.FromSlash("testdata/valid_key_file"),
 							},
@@ -393,8 +395,8 @@ var expectedConf = &Config{
 
 			MetricsPath: DefaultScrapeConfig.MetricsPath,
 			Scheme:      DefaultScrapeConfig.Scheme,
-			HTTPClientConfig: config_util.HTTPClientConfig{
-				BasicAuth: &config_util.BasicAuth{
+			HTTPClientConfig: config.HTTPClientConfig{
+				BasicAuth: &config.BasicAuth{
 					Username:     "myusername",
 					PasswordFile: filepath.FromSlash("testdata/valid_password_file"),
 				},
@@ -431,9 +433,9 @@ var expectedConf = &Config{
 							"https://marathon.example.com:443",
 						},
 						RefreshInterval: model.Duration(30 * time.Second),
-						AuthToken:       config_util.Secret("mysecret"),
-						HTTPClientConfig: config_util.HTTPClientConfig{
-							TLSConfig: config_util.TLSConfig{
+						AuthToken:       config.Secret("mysecret"),
+						HTTPClientConfig: config.HTTPClientConfig{
+							TLSConfig: config.TLSConfig{
 								CertFile: filepath.FromSlash("testdata/valid_cert_file"),
 								KeyFile:  filepath.FromSlash("testdata/valid_key_file"),
 							},
@@ -609,7 +611,7 @@ var expectedConf = &Config{
 						Port:            9163,
 						RefreshInterval: model.Duration(60 * time.Second),
 						Version:         1,
-						TLSConfig: config_util.TLSConfig{
+						TLSConfig: config.TLSConfig{
 							CertFile: "testdata/valid_cert_file",
 							KeyFile:  "testdata/valid_key_file",
 						},
@@ -630,7 +632,7 @@ var expectedConf = &Config{
 			ServiceDiscoveryConfig: discoverer.ServiceDiscoveryConfig{
 				DigitalOceanSDConfigs: []*digitalocean.SDConfig{
 					{
-						HTTPClientConfig: config_util.HTTPClientConfig{
+						HTTPClientConfig: config.HTTPClientConfig{
 							BearerToken: "abcdef",
 						},
 						Port:            80,
@@ -678,7 +680,7 @@ var expectedConf = &Config{
 						Port:            80,
 						Availability:    "public",
 						RefreshInterval: model.Duration(60 * time.Second),
-						TLSConfig: config_util.TLSConfig{
+						TLSConfig: config.TLSConfig{
 							CAFile:   "testdata/valid_ca_file",
 							CertFile: "testdata/valid_cert_file",
 							KeyFile:  "testdata/valid_key_file",
@@ -711,6 +713,55 @@ var expectedConf = &Config{
 			},
 		},
 	},
+}
+
+func assertConfigsEqual(t testing.TB, want, got interface{}, opts ...cmp.Option) {
+	cmpOpts := []cmp.Option{
+		cmp.Comparer(func(x, y relabel.Regexp) bool {
+			// Regexps have unexported state.
+			return x.String() == y.String()
+		}),
+		cmp.Transformer("discovery.Config.Sorter", func(cfgs []discoverer.Config) []discoverer.Config {
+			// The service discovery configs are marshaled and unmarshaled
+			// in a particular order, sorted by their names and with
+			// static_configs always at the end.
+			//
+			// At the time of writing this comment, all of the test configs
+			// are in this expected order, but adding this tranformer protects
+			// future test writers from going mad over inexplicably failed
+			// comparisons between unmarshaled yaml configs and hand-crafted
+			// go values (with configs in the "wrong" order).
+			clone := append(make([]discoverer.Config, 0, len(cfgs)), cfgs...)
+			sort.SliceStable(clone, func(i, k int) bool {
+				return clone[i].Name() < clone[k].Name()
+			})
+			return clone
+		}),
+	}
+	if diff := cmp.Diff(want, got, append(cmpOpts, opts...)...); diff != "" {
+		t.Fatalf("unexpected diff:\n\n%v", diff)
+	}
+}
+
+func allowHiddenSecrets() cmp.Option {
+	return cmp.Comparer(func(x, y config.Secret) bool {
+		// Secrets are marshaled as "<secret>" and can't be compared
+		// to the original. We just compare if they exist.
+		return (x == "") == (y == "")
+	})
+}
+
+func TestYAMLRoundtrip(t *testing.T) {
+	want, err := LoadFile("testdata/conf.good.yml")
+	testutil.Ok(t, err)
+
+	out, err := yaml.Marshal(want)
+	testutil.Ok(t, err)
+
+	got := &Config{}
+	testutil.Ok(t, yaml.UnmarshalStrict(out, got))
+
+	assertConfigsEqual(t, want, got, allowHiddenSecrets())
 }
 
 func TestLoadConfig(t *testing.T) {
@@ -1032,7 +1083,7 @@ func TestEmptyGlobalBlock(t *testing.T) {
 	testutil.Equals(t, exp, *c)
 }
 
-func kubernetesSDHostURL() config_util.URL {
+func kubernetesSDHostURL() config.URL {
 	tURL, _ := url.Parse("https://localhost:1234")
-	return config_util.URL{URL: tURL}
+	return config.URL{URL: tURL}
 }

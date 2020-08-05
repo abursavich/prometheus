@@ -27,6 +27,7 @@ require (
 	github.com/go-openapi/strfmt v0.19.5
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/snappy v0.0.1
+	github.com/google/go-cmp v0.5.1
 	github.com/google/pprof v0.0.0-20200708004538-1a94d8640e99
 	github.com/googleapis/gnostic v0.4.0 // indirect
 	github.com/gophercloud/gophercloud v0.12.0
