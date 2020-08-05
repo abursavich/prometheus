@@ -216,15 +216,55 @@ If all the targets in a group go away, we need to send the target groups with em
 ```
 down the channel.
 
+### The Config interface
+
+Now that your service discovery mechanism is ready to discover targets, you must help
+Prometheus discover it. This is done by implementing the `discovery.Config` interface
+and registering it with `config.RegisterServiceDiscovery` in an init function of your
+package.
+
+```go
+type Config interface {
+	// Name returns the name of the discovery mechanism.
+	Name() string
+
+	// NewDiscoverer returns a Discoverer for the Config
+	// with the given DiscovererOptions.
+	NewDiscoverer(DiscovererOptions) (Discoverer, error)
+
+	// SetOptions applies the ConfigOptions to the Config.
+	SetOptions(ConfigOptions)
+
+	// Validate checks the Config for errors.
+	Validate() error
+}
+
+type ConfigOptions struct {
+	// Directory may be used to resolve relative file paths
+	// in the config (e.g. TLS certificates).
+	Directory string
+}
+
+type DiscovererOptions struct {
+	Logger log.Logger
+}
+```
+
+The value returned by `Name()` should be short, descriptive, lowercase, and unique.
+It's used to tag the provided `Logger` and as the part of the YAML key for your SD
+mechanism's list of configs in `scrape_config` and `alertmanager_config`
+(e.g. `${NAME}_sd_configs`).
+
 ### New Service Discovery Check List
 
 Here are some non-obvious parts of adding service discoveries that need to be verified:
 
-- Check for `nil` SDConfigs in `discovery/config/config.go`.
 - Validate that discovery configs can be DeepEqualled by adding them to
   `config/testdata/conf.good.yml` and to the associated tests.
-- If there is a TLSConfig or HTTPClientConfig, add them to
-  `resolveFilepaths` in `config/config.go`.
+
+- Import your SD package from `prometheus/discovery/install`. The install package is
+  imported from `main` to register all builtin SD mechanisms.
+
 - List the service discovery in both `<scrape_config>` and
   `<alertmanager_config>` in `docs/configuration/configuration.md`.
 
