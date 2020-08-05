@@ -145,11 +145,11 @@ var expectedConf = &Config{
 			},
 
 			ServiceDiscoveryConfigs: []discovery.Config{
-				&file.SDConfig{
+				&file.Config{
 					Files:           []string{"testdata/foo/*.slow.json", "testdata/foo/*.slow.yml", "testdata/single/file.yml"},
 					RefreshInterval: model.Duration(10 * time.Minute),
 				},
-				&file.SDConfig{
+				&file.Config{
 					Files:           []string{"testdata/bar/*.yaml"},
 					RefreshInterval: model.Duration(5 * time.Minute),
 				},
@@ -217,7 +217,7 @@ var expectedConf = &Config{
 			Scheme:      "https",
 
 			ServiceDiscoveryConfigs: []discovery.Config{
-				&dns.SDConfig{
+				&dns.Config{
 					Names: []string{
 						"first.dns.address.domain.com",
 						"second.dns.address.domain.com",
@@ -225,7 +225,7 @@ var expectedConf = &Config{
 					RefreshInterval: model.Duration(15 * time.Second),
 					Type:            "SRV",
 				},
-				&dns.SDConfig{
+				&dns.Config{
 					Names: []string{
 						"first.dns.address.domain.com",
 					},
@@ -298,15 +298,15 @@ var expectedConf = &Config{
 			Scheme:      DefaultScrapeConfig.Scheme,
 
 			ServiceDiscoveryConfigs: []discovery.Config{
-				&consul.SDConfig{
+				&consul.Config{
 					Server:          "localhost:1234",
 					Token:           "mysecret",
 					Services:        []string{"nginx", "cache", "mysql"},
 					ServiceTags:     []string{"canary", "v1"},
 					NodeMeta:        map[string]string{"rack": "123"},
-					TagSeparator:    consul.DefaultSDConfig.TagSeparator,
+					TagSeparator:    consul.DefaultConfig.TagSeparator,
 					Scheme:          "https",
-					RefreshInterval: consul.DefaultSDConfig.RefreshInterval,
+					RefreshInterval: consul.DefaultConfig.RefreshInterval,
 					AllowStale:      true,
 					TLSConfig: config_util.TLSConfig{
 						CertFile:           filepath.FromSlash("testdata/valid_cert_file"),
@@ -358,7 +358,7 @@ var expectedConf = &Config{
 			Scheme:      DefaultScrapeConfig.Scheme,
 
 			ServiceDiscoveryConfigs: []discovery.Config{
-				&kubernetes.SDConfig{
+				&kubernetes.Config{
 					APIServer: kubernetesSDHostURL(),
 					Role:      kubernetes.RoleEndpoint,
 					HTTPClientConfig: config_util.HTTPClientConfig{
@@ -392,7 +392,7 @@ var expectedConf = &Config{
 			},
 
 			ServiceDiscoveryConfigs: []discovery.Config{
-				&kubernetes.SDConfig{
+				&kubernetes.Config{
 					APIServer: kubernetesSDHostURL(),
 					Role:      kubernetes.RoleEndpoint,
 					NamespaceDiscovery: kubernetes.NamespaceDiscovery{
@@ -414,7 +414,7 @@ var expectedConf = &Config{
 			Scheme:      DefaultScrapeConfig.Scheme,
 
 			ServiceDiscoveryConfigs: []discovery.Config{
-				&marathon.SDConfig{
+				&marathon.Config{
 					Servers: []string{
 						"https://marathon.example.com:443",
 					},
@@ -440,7 +440,7 @@ var expectedConf = &Config{
 			Scheme:      DefaultScrapeConfig.Scheme,
 
 			ServiceDiscoveryConfigs: []discovery.Config{
-				&ec2.SDConfig{
+				&ec2.Config{
 					Region:          "us-east-1",
 					AccessKey:       "access",
 					SecretKey:       "mysecret",
@@ -471,7 +471,7 @@ var expectedConf = &Config{
 			Scheme:      DefaultScrapeConfig.Scheme,
 
 			ServiceDiscoveryConfigs: []discovery.Config{
-				&azure.SDConfig{
+				&azure.Config{
 					Environment:          "AzurePublicCloud",
 					SubscriptionID:       "11AAAA11-A11A-111A-A111-1111A1111A11",
 					TenantID:             "BBBB222B-B2B2-2B22-B222-2BB2222BB2B2",
@@ -494,7 +494,7 @@ var expectedConf = &Config{
 			Scheme:      DefaultScrapeConfig.Scheme,
 
 			ServiceDiscoveryConfigs: []discovery.Config{
-				&zookeeper.NerveSDConfig{
+				&zookeeper.NerveConfig{
 					Servers: []string{"localhost"},
 					Paths:   []string{"/monitoring"},
 					Timeout: model.Duration(10 * time.Second),
@@ -575,7 +575,7 @@ var expectedConf = &Config{
 			Scheme:      DefaultScrapeConfig.Scheme,
 
 			ServiceDiscoveryConfigs: []discovery.Config{
-				&triton.SDConfig{
+				&triton.Config{
 					Account:         "testAccount",
 					Role:            "container",
 					DNSSuffix:       "triton.example.com",
@@ -601,7 +601,7 @@ var expectedConf = &Config{
 			Scheme:      DefaultScrapeConfig.Scheme,
 
 			ServiceDiscoveryConfigs: []discovery.Config{
-				&digitalocean.SDConfig{
+				&digitalocean.Config{
 					HTTPClientConfig: config_util.HTTPClientConfig{
 						BearerToken: "abcdef",
 					},
@@ -621,7 +621,7 @@ var expectedConf = &Config{
 			Scheme:      DefaultScrapeConfig.Scheme,
 
 			ServiceDiscoveryConfigs: []discovery.Config{
-				&dockerswarm.SDConfig{
+				&dockerswarm.Config{
 					Host:            "http://127.0.0.1:2375",
 					Role:            "nodes",
 					Port:            80,
@@ -639,7 +639,7 @@ var expectedConf = &Config{
 			MetricsPath: DefaultScrapeConfig.MetricsPath,
 			Scheme:      DefaultScrapeConfig.Scheme,
 
-			ServiceDiscoveryConfigs: []discovery.Config{&openstack.SDConfig{
+			ServiceDiscoveryConfigs: []discovery.Config{&openstack.Config{
 				Role:            "instance",
 				Region:          "RegionOne",
 				Port:            80,

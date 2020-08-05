@@ -35,46 +35,46 @@ import (
 )
 
 var (
-	// DefaultServersetSDConfig is the default Serverset SD configuration.
-	DefaultServersetSDConfig = ServersetSDConfig{
+	// DefaultServersetConfig is the default Serverset SD configuration.
+	DefaultServersetConfig = ServersetConfig{
 		Timeout: model.Duration(10 * time.Second),
 	}
-	// DefaultNerveSDConfig is the default Nerve SD configuration.
-	DefaultNerveSDConfig = NerveSDConfig{
+	// DefaultNerveConfig is the default Nerve SD configuration.
+	DefaultNerveConfig = NerveConfig{
 		Timeout: model.Duration(10 * time.Second),
 	}
 )
 
 func init() {
-	config.RegisterServiceDiscovery(&ServersetSDConfig{})
-	config.RegisterServiceDiscovery(&NerveSDConfig{})
+	config.RegisterServiceDiscovery(&ServersetConfig{})
+	config.RegisterServiceDiscovery(&NerveConfig{})
 }
 
-// ServersetSDConfig is the configuration for Twitter serversets in Zookeeper based discovery.
-type ServersetSDConfig struct {
+// ServersetConfig is the configuration for Twitter serversets in Zookeeper based discovery.
+type ServersetConfig struct {
 	Servers []string       `yaml:"servers"`
 	Paths   []string       `yaml:"paths"`
 	Timeout model.Duration `yaml:"timeout,omitempty"`
 }
 
 // Name returns the name of the Config.
-func (*ServersetSDConfig) Name() string { return "serverset" }
+func (*ServersetConfig) Name() string { return "serverset" }
 
 // NewDiscoverer returns a Discoverer for the Config.
-func (c *ServersetSDConfig) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
+func (c *ServersetConfig) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
 	return NewServersetDiscovery(c, opts.Logger)
 }
 
 // SetOptions applies the options to the Config.
-func (c *ServersetSDConfig) SetOptions(opts discovery.ConfigOptions) {}
+func (c *ServersetConfig) SetOptions(opts discovery.ConfigOptions) {}
 
 // Validate checks the Config for errors.
-func (*ServersetSDConfig) Validate() error { return nil }
+func (*ServersetConfig) Validate() error { return nil }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
-func (c *ServersetSDConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	*c = DefaultServersetSDConfig
-	type plain ServersetSDConfig
+func (c *ServersetConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	*c = DefaultServersetConfig
+	type plain ServersetConfig
 	err := unmarshal((*plain)(c))
 	if err != nil {
 		return err
@@ -93,31 +93,31 @@ func (c *ServersetSDConfig) UnmarshalYAML(unmarshal func(interface{}) error) err
 	return nil
 }
 
-// NerveSDConfig is the configuration for AirBnB's Nerve in Zookeeper based discovery.
-type NerveSDConfig struct {
+// NerveConfig is the configuration for AirBnB's Nerve in Zookeeper based discovery.
+type NerveConfig struct {
 	Servers []string       `yaml:"servers"`
 	Paths   []string       `yaml:"paths"`
 	Timeout model.Duration `yaml:"timeout,omitempty"`
 }
 
 // Name returns the name of the Config.
-func (*NerveSDConfig) Name() string { return "nerve" }
+func (*NerveConfig) Name() string { return "nerve" }
 
 // NewDiscoverer returns a Discoverer for the Config.
-func (c *NerveSDConfig) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
+func (c *NerveConfig) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
 	return NewNerveDiscovery(c, opts.Logger)
 }
 
 // SetOptions applies the options to the Config.
-func (c *NerveSDConfig) SetOptions(opts discovery.ConfigOptions) {}
+func (c *NerveConfig) SetOptions(opts discovery.ConfigOptions) {}
 
 // Validate checks the Config for errors.
-func (*NerveSDConfig) Validate() error { return nil }
+func (*NerveConfig) Validate() error { return nil }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
-func (c *NerveSDConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	*c = DefaultNerveSDConfig
-	type plain NerveSDConfig
+func (c *NerveConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	*c = DefaultNerveConfig
+	type plain NerveConfig
 	err := unmarshal((*plain)(c))
 	if err != nil {
 		return err
@@ -152,12 +152,12 @@ type Discovery struct {
 }
 
 // NewNerveDiscovery returns a new Discovery for the given Nerve config.
-func NewNerveDiscovery(conf *NerveSDConfig, logger log.Logger) (*Discovery, error) {
+func NewNerveDiscovery(conf *NerveConfig, logger log.Logger) (*Discovery, error) {
 	return NewDiscovery(conf.Servers, time.Duration(conf.Timeout), conf.Paths, logger, parseNerveMember)
 }
 
 // NewServersetDiscovery returns a new Discovery for the given serverset config.
-func NewServersetDiscovery(conf *ServersetSDConfig, logger log.Logger) (*Discovery, error) {
+func NewServersetDiscovery(conf *ServersetConfig, logger log.Logger) (*Discovery, error) {
 	return NewDiscovery(conf.Servers, time.Duration(conf.Timeout), conf.Paths, logger, parseServersetMember)
 }
 

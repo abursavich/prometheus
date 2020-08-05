@@ -39,7 +39,7 @@ func (s *OpenstackSDInstanceTestSuite) SetupTest(t *testing.T) {
 }
 
 func (s *OpenstackSDInstanceTestSuite) openstackAuthSuccess() (refresher, error) {
-	conf := SDConfig{
+	conf := Config{
 		IdentityEndpoint: s.Mock.Endpoint(),
 		Password:         "test",
 		Username:         "test",

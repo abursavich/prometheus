@@ -148,7 +148,7 @@ func (t *testRunner) run(files ...string) {
 	t.cancelSD = cancel
 	go func() {
 		NewDiscovery(
-			&SDConfig{
+			&Config{
 				Files: files,
 				// Setting a high refresh interval to make sure that the tests only
 				// rely on file watches.

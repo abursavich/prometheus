@@ -28,7 +28,7 @@ import (
 var (
 	marathonValidLabel = map[string]string{"prometheus": "yes"}
 	testServers        = []string{"http://localhost:8080"}
-	conf               = SDConfig{Servers: testServers}
+	conf               = Config{Servers: testServers}
 )
 
 func testUpdateServices(client appListClient) ([]*targetgroup.Group, error) {
@@ -291,7 +291,7 @@ func Test500ErrorHttpResponseWithValidJSONBody(t *testing.T) {
 		conf = backupConf
 	}()
 	// Setup conf for the test case.
-	conf = SDConfig{Servers: []string{ts.URL}}
+	conf = Config{Servers: []string{ts.URL}}
 	// Execute test case and validate behavior.
 	_, err := testUpdateServices(nil)
 	if err == nil {

@@ -46,8 +46,8 @@ const (
 	tritonLabelServerID     = tritonLabel + "server_id"
 )
 
-// DefaultSDConfig is the default Triton SD configuration.
-var DefaultSDConfig = SDConfig{
+// DefaultConfig is the default Triton SD configuration.
+var DefaultConfig = Config{
 	Role:            "container",
 	Port:            9163,
 	RefreshInterval: model.Duration(60 * time.Second),
@@ -55,11 +55,11 @@ var DefaultSDConfig = SDConfig{
 }
 
 func init() {
-	config.RegisterServiceDiscovery(&SDConfig{})
+	config.RegisterServiceDiscovery(&Config{})
 }
 
-// SDConfig is the configuration for Triton based service discovery.
-type SDConfig struct {
+// Config is the configuration for Triton based service discovery.
+type Config struct {
 	Account         string                `yaml:"account"`
 	Role            string                `yaml:"role"`
 	DNSSuffix       string                `yaml:"dns_suffix"`
@@ -72,27 +72,27 @@ type SDConfig struct {
 }
 
 // Name returns the name of the Config.
-func (*SDConfig) Name() string { return "triton" }
+func (*Config) Name() string { return "triton" }
 
 // NewDiscoverer returns a Discoverer for the Config.
-func (c *SDConfig) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
+func (c *Config) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
 	return New(opts.Logger, c)
 }
 
 // SetOptions applies the options to the Config.
-func (c *SDConfig) SetOptions(opts discovery.ConfigOptions) {
+func (c *Config) SetOptions(opts discovery.ConfigOptions) {
 	config.SetTLSConfigDirectory(&c.TLSConfig, opts.Directory)
 }
 
 // Validate checks the Config for errors.
-func (c *SDConfig) Validate() error {
+func (c *Config) Validate() error {
 	return config.ValidateTLSConfig(&c.TLSConfig)
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
-func (c *SDConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	*c = DefaultSDConfig
-	type plain SDConfig
+func (c *Config) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	*c = DefaultConfig
+	type plain Config
 	err := unmarshal((*plain)(c))
 	if err != nil {
 		return err
@@ -141,11 +141,11 @@ type Discovery struct {
 	*refresh.Discovery
 	client   *http.Client
 	interval time.Duration
-	sdConfig *SDConfig
+	config   *Config
 }
 
 // New returns a new Discovery which periodically refreshes its targets.
-func New(logger log.Logger, conf *SDConfig) (*Discovery, error) {
+func New(logger log.Logger, conf *Config) (*Discovery, error) {
 	tls, err := config_util.NewTLSConfig(&conf.TLSConfig)
 	if err != nil {
 		return nil, err
@@ -163,7 +163,7 @@ func New(logger log.Logger, conf *SDConfig) (*Discovery, error) {
 	d := &Discovery{
 		client:   client,
 		interval: time.Duration(conf.RefreshInterval),
-		sdConfig: conf,
+		config:   conf,
 	}
 	d.Discovery = refresh.NewDiscovery(
 		logger,
@@ -188,17 +188,17 @@ func New(logger log.Logger, conf *SDConfig) (*Discovery, error) {
 
 func (d *Discovery) refresh(ctx context.Context) ([]*targetgroup.Group, error) {
 	var endpointFormat string
-	switch d.sdConfig.Role {
+	switch d.config.Role {
 	case "container":
 		endpointFormat = "https://%s:%d/v%d/discover"
 	case "cn":
 		endpointFormat = "https://%s:%d/v%d/gz/discover"
 	default:
-		return nil, errors.New(fmt.Sprintf("unknown role '%s' in configuration", d.sdConfig.Role))
+		return nil, errors.New(fmt.Sprintf("unknown role '%s' in configuration", d.config.Role))
 	}
-	var endpoint = fmt.Sprintf(endpointFormat, d.sdConfig.Endpoint, d.sdConfig.Port, d.sdConfig.Version)
-	if len(d.sdConfig.Groups) > 0 {
-		groups := url.QueryEscape(strings.Join(d.sdConfig.Groups, ","))
+	var endpoint = fmt.Sprintf(endpointFormat, d.config.Endpoint, d.config.Port, d.config.Version)
+	if len(d.config.Groups) > 0 {
+		groups := url.QueryEscape(strings.Join(d.config.Groups, ","))
 		endpoint = fmt.Sprintf("%s?groups=%s", endpoint, groups)
 	}
 
@@ -223,13 +223,13 @@ func (d *Discovery) refresh(ctx context.Context) ([]*targetgroup.Group, error) {
 	}
 
 	// The JSON response body is different so it needs to be processed/mapped separately.
-	switch d.sdConfig.Role {
+	switch d.config.Role {
 	case "container":
 		return d.processContainerResponse(data, endpoint)
 	case "cn":
 		return d.processComputeNodeResponse(data, endpoint)
 	default:
-		return nil, errors.New(fmt.Sprintf("unknown role '%s' in configuration", d.sdConfig.Role))
+		return nil, errors.New(fmt.Sprintf("unknown role '%s' in configuration", d.config.Role))
 	}
 }
 
@@ -252,7 +252,7 @@ func (d *Discovery) processContainerResponse(data []byte, endpoint string) ([]*t
 			tritonLabelMachineImage: model.LabelValue(container.VMImageUUID),
 			tritonLabelServerID:     model.LabelValue(container.ServerUUID),
 		}
-		addr := fmt.Sprintf("%s.%s:%d", container.VMUUID, d.sdConfig.DNSSuffix, d.sdConfig.Port)
+		addr := fmt.Sprintf("%s.%s:%d", container.VMUUID, d.config.DNSSuffix, d.config.Port)
 		labels[model.AddressLabel] = model.LabelValue(addr)
 
 		if len(container.Groups) > 0 {
@@ -282,7 +282,7 @@ func (d *Discovery) processComputeNodeResponse(data []byte, endpoint string) ([]
 			tritonLabelMachineID:    model.LabelValue(cn.ServerUUID),
 			tritonLabelMachineAlias: model.LabelValue(cn.ServerHostname),
 		}
-		addr := fmt.Sprintf("%s.%s:%d", cn.ServerUUID, d.sdConfig.DNSSuffix, d.sdConfig.Port)
+		addr := fmt.Sprintf("%s.%s:%d", cn.ServerUUID, d.config.DNSSuffix, d.config.Port)
 		labels[model.AddressLabel] = model.LabelValue(addr)
 
 		tg.Targets = append(tg.Targets, labels)

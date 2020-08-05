@@ -44,7 +44,7 @@ func TestDigitalOceanSDRefresh(t *testing.T) {
 	sdmock.SetupTest(t)
 	t.Cleanup(sdmock.TearDownSuite)
 
-	cfg := DefaultSDConfig
+	cfg := DefaultConfig
 	cfg.HTTPClientConfig.BearerToken = tokenID
 	d, err := NewDiscovery(&cfg, log.NewNopLogger())
 	testutil.Ok(t, err)

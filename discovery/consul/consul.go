@@ -91,8 +91,8 @@ var (
 	servicesRPCDuration = rpcDuration.WithLabelValues("catalog", "services")
 	serviceRPCDuration  = rpcDuration.WithLabelValues("catalog", "service")
 
-	// DefaultSDConfig is the default Consul SD configuration.
-	DefaultSDConfig = SDConfig{
+	// DefaultConfig is the default Consul SD configuration.
+	DefaultConfig = Config{
 		TagSeparator:    ",",
 		Scheme:          "http",
 		Server:          "localhost:8500",
@@ -102,13 +102,13 @@ var (
 )
 
 func init() {
-	config.RegisterServiceDiscovery(&SDConfig{})
+	config.RegisterServiceDiscovery(&Config{})
 	prometheus.MustRegister(rpcFailuresCount)
 	prometheus.MustRegister(rpcDuration)
 }
 
-// SDConfig is the configuration for Consul service discovery.
-type SDConfig struct {
+// Config is the configuration for Consul service discovery.
+type Config struct {
 	Server       string             `yaml:"server,omitempty"`
 	Token        config_util.Secret `yaml:"token,omitempty"`
 	Datacenter   string             `yaml:"datacenter,omitempty"`
@@ -139,27 +139,27 @@ type SDConfig struct {
 }
 
 // Name returns the name of the Config.
-func (*SDConfig) Name() string { return "consul" }
+func (*Config) Name() string { return "consul" }
 
 // NewDiscoverer returns a Discoverer for the Config.
-func (c *SDConfig) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
+func (c *Config) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
 	return NewDiscovery(c, opts.Logger)
 }
 
 // SetOptions applies the options to the Config.
-func (c *SDConfig) SetOptions(opts discovery.ConfigOptions) {
+func (c *Config) SetOptions(opts discovery.ConfigOptions) {
 	config.SetTLSConfigDirectory(&c.TLSConfig, opts.Directory)
 }
 
 // Validate checks the Config for errors.
-func (c *SDConfig) Validate() error {
+func (c *Config) Validate() error {
 	return config.ValidateTLSConfig(&c.TLSConfig)
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
-func (c *SDConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	*c = DefaultSDConfig
-	type plain SDConfig
+func (c *Config) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	*c = DefaultConfig
+	type plain Config
 	err := unmarshal((*plain)(c))
 	if err != nil {
 		return err
@@ -186,7 +186,7 @@ type Discovery struct {
 }
 
 // NewDiscovery returns a new Discovery for the given config.
-func NewDiscovery(conf *SDConfig, logger log.Logger) (*Discovery, error) {
+func NewDiscovery(conf *Config, logger log.Logger) (*Discovery, error) {
 	if logger == nil {
 		logger = log.NewNopLogger()
 	}

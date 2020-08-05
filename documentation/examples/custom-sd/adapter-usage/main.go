@@ -76,7 +76,7 @@ type CatalogService struct {
 }
 
 // Note: create a config struct for your custom SD type here.
-type sdConfig struct {
+type config struct {
 	Address         string
 	TagSeparator    string
 	RefreshInterval int
@@ -221,7 +221,7 @@ func (d *discovery) Run(ctx context.Context, ch chan<- []*targetgroup.Group) {
 	}
 }
 
-func newDiscovery(conf sdConfig) (*discovery, error) {
+func newDiscovery(conf config) (*discovery, error) {
 	cd := &discovery{
 		address:         conf.Address,
 		refreshInterval: conf.RefreshInterval,
@@ -246,7 +246,7 @@ func main() {
 	ctx := context.Background()
 
 	// NOTE: create an instance of your new SD implementation here.
-	cfg := sdConfig{
+	cfg := config{
 		TagSeparator:    ",",
 		Address:         *listenAddress,
 		RefreshInterval: 30,

@@ -37,14 +37,14 @@ func TestMain(m *testing.M) {
 func TestDNS(t *testing.T) {
 	testCases := []struct {
 		name   string
-		config SDConfig
+		config Config
 		lookup func(name string, qtype uint16, logger log.Logger) (*dns.Msg, error)
 
 		expected []*targetgroup.Group
 	}{
 		{
 			name: "A record query with error",
-			config: SDConfig{
+			config: Config{
 				Names:           []string{"web.example.com."},
 				RefreshInterval: model.Duration(time.Minute),
 				Port:            80,
@@ -57,7 +57,7 @@ func TestDNS(t *testing.T) {
 		},
 		{
 			name: "A record query",
-			config: SDConfig{
+			config: Config{
 				Names:           []string{"web.example.com."},
 				RefreshInterval: model.Duration(time.Minute),
 				Port:            80,
@@ -87,7 +87,7 @@ func TestDNS(t *testing.T) {
 		},
 		{
 			name: "AAAA record query",
-			config: SDConfig{
+			config: Config{
 				Names:           []string{"web.example.com."},
 				RefreshInterval: model.Duration(time.Minute),
 				Port:            80,
@@ -117,7 +117,7 @@ func TestDNS(t *testing.T) {
 		},
 		{
 			name: "SRV record query",
-			config: SDConfig{
+			config: Config{
 				Names:           []string{"_mysql._tcp.db.example.com."},
 				Type:            "SRV",
 				RefreshInterval: model.Duration(time.Minute),
@@ -153,7 +153,7 @@ func TestDNS(t *testing.T) {
 		},
 		{
 			name: "SRV record query with unsupported resource records",
-			config: SDConfig{
+			config: Config{
 				Names:           []string{"_mysql._tcp.db.example.com."},
 				RefreshInterval: model.Duration(time.Minute),
 			},
@@ -182,7 +182,7 @@ func TestDNS(t *testing.T) {
 		},
 		{
 			name: "SRV record query with empty answer (NXDOMAIN)",
-			config: SDConfig{
+			config: Config{
 				Names:           []string{"_mysql._tcp.db.example.com."},
 				RefreshInterval: model.Duration(time.Minute),
 			},
@@ -211,8 +211,8 @@ func TestDNS(t *testing.T) {
 	}
 }
 
-func TestSDConfigUnmarshalYAML(t *testing.T) {
-	marshal := func(c SDConfig) []byte {
+func TestConfigUnmarshalYAML(t *testing.T) {
+	marshal := func(c Config) []byte {
 		d, err := yaml.Marshal(c)
 		if err != nil {
 			panic(err)
@@ -228,12 +228,12 @@ func TestSDConfigUnmarshalYAML(t *testing.T) {
 
 	cases := []struct {
 		name      string
-		input     SDConfig
+		input     Config
 		expectErr bool
 	}{
 		{
 			name: "valid srv",
-			input: SDConfig{
+			input: Config{
 				Names: []string{"a.example.com", "b.example.com"},
 				Type:  "SRV",
 			},
@@ -241,7 +241,7 @@ func TestSDConfigUnmarshalYAML(t *testing.T) {
 		},
 		{
 			name: "valid a",
-			input: SDConfig{
+			input: Config{
 				Names: []string{"a.example.com", "b.example.com"},
 				Type:  "A",
 				Port:  5300,
@@ -250,7 +250,7 @@ func TestSDConfigUnmarshalYAML(t *testing.T) {
 		},
 		{
 			name: "valid aaaa",
-			input: SDConfig{
+			input: Config{
 				Names: []string{"a.example.com", "b.example.com"},
 				Type:  "AAAA",
 				Port:  5300,
@@ -259,7 +259,7 @@ func TestSDConfigUnmarshalYAML(t *testing.T) {
 		},
 		{
 			name: "invalid a without port",
-			input: SDConfig{
+			input: Config{
 				Names: []string{"a.example.com", "b.example.com"},
 				Type:  "A",
 			},
@@ -267,7 +267,7 @@ func TestSDConfigUnmarshalYAML(t *testing.T) {
 		},
 		{
 			name: "invalid aaaa without port",
-			input: SDConfig{
+			input: Config{
 				Names: []string{"a.example.com", "b.example.com"},
 				Type:  "AAAA",
 			},
@@ -275,7 +275,7 @@ func TestSDConfigUnmarshalYAML(t *testing.T) {
 		},
 		{
 			name: "invalid empty names",
-			input: SDConfig{
+			input: Config{
 				Names: []string{},
 				Type:  "AAAA",
 			},
@@ -283,7 +283,7 @@ func TestSDConfigUnmarshalYAML(t *testing.T) {
 		},
 		{
 			name: "invalid unknown dns type",
-			input: SDConfig{
+			input: Config{
 				Names: []string{"a.example.com", "b.example.com"},
 				Type:  "PTR",
 			},
@@ -293,7 +293,7 @@ func TestSDConfigUnmarshalYAML(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			var config SDConfig
+			var config Config
 			d := marshal(c.input)
 			err := config.UnmarshalYAML(unmarshal(d))
 			testutil.Equals(t, c.expectErr, err != nil)

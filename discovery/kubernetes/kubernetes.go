@@ -64,12 +64,12 @@ var (
 		},
 		[]string{"role", "event"},
 	)
-	// DefaultSDConfig is the default Kubernetes SD configuration
-	DefaultSDConfig = SDConfig{}
+	// DefaultConfig is the default Kubernetes SD configuration
+	DefaultConfig = Config{}
 )
 
 func init() {
-	config.RegisterServiceDiscovery(&SDConfig{})
+	config.RegisterServiceDiscovery(&Config{})
 	prometheus.MustRegister(eventCount)
 	// Initialize metric vectors.
 	for _, role := range []string{"endpoints", "node", "pod", "service", "ingress"} {
@@ -106,8 +106,8 @@ func (c *Role) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	}
 }
 
-// SDConfig is the configuration for Kubernetes service discovery.
-type SDConfig struct {
+// Config is the configuration for Kubernetes service discovery.
+type Config struct {
 	APIServer          config_util.URL              `yaml:"api_server,omitempty"`
 	Role               Role                         `yaml:"role"`
 	HTTPClientConfig   config_util.HTTPClientConfig `yaml:",inline"`
@@ -116,20 +116,20 @@ type SDConfig struct {
 }
 
 // Name returns the name of the Config.
-func (*SDConfig) Name() string { return "kubernetes" }
+func (*Config) Name() string { return "kubernetes" }
 
 // NewDiscoverer returns a Discoverer for the Config.
-func (c *SDConfig) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
+func (c *Config) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
 	return New(opts.Logger, c)
 }
 
 // SetOptions applies the options to the Config.
-func (c *SDConfig) SetOptions(opts discovery.ConfigOptions) {
+func (c *Config) SetOptions(opts discovery.ConfigOptions) {
 	config.SetHTTPClientConfigDirectory(&c.HTTPClientConfig, opts.Directory)
 }
 
 // Validate checks the Config for errors.
-func (c *SDConfig) Validate() error {
+func (c *Config) Validate() error {
 	return config.ValidateHTTPClientConfig(&c.HTTPClientConfig)
 }
 
@@ -153,9 +153,9 @@ type resourceSelector struct {
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
-func (c *SDConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	*c = SDConfig{}
-	type plain SDConfig
+func (c *Config) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	*c = Config{}
+	type plain Config
 	err := unmarshal((*plain)(c))
 	if err != nil {
 		return err
@@ -247,7 +247,7 @@ func (d *Discovery) getNamespaces() []string {
 }
 
 // New creates a new Kubernetes discovery for the given role.
-func New(l log.Logger, conf *SDConfig) (*Discovery, error) {
+func New(l log.Logger, conf *Config) (*Discovery, error) {
 	if l == nil {
 		l = log.NewNopLogger()
 	}

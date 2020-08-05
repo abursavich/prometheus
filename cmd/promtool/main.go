@@ -266,7 +266,7 @@ func checkConfig(filename string) ([]string, error) {
 			if err := c.Validate(); err != nil {
 				return nil, errors.Wrapf(err, "error validating %v service discovery config", c.Name())
 			}
-			if c, ok := c.(*file.SDConfig); ok {
+			if c, ok := c.(*file.Config); ok {
 				for _, file := range c.Files {
 					files, err := filepath.Glob(file)
 					if err != nil {

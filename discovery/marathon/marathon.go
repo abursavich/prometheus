@@ -60,17 +60,17 @@ const (
 	portDefinitionLabelPrefix = metaLabelPrefix + "port_definition_label_"
 )
 
-// DefaultSDConfig is the default Marathon SD configuration.
-var DefaultSDConfig = SDConfig{
+// DefaultConfig is the default Marathon SD configuration.
+var DefaultConfig = Config{
 	RefreshInterval: model.Duration(30 * time.Second),
 }
 
 func init() {
-	config.RegisterServiceDiscovery(&SDConfig{})
+	config.RegisterServiceDiscovery(&Config{})
 }
 
-// SDConfig is the configuration for services running on Marathon.
-type SDConfig struct {
+// Config is the configuration for services running on Marathon.
+type Config struct {
 	Servers          []string                     `yaml:"servers,omitempty"`
 	RefreshInterval  model.Duration               `yaml:"refresh_interval,omitempty"`
 	AuthToken        config_util.Secret           `yaml:"auth_token,omitempty"`
@@ -79,28 +79,28 @@ type SDConfig struct {
 }
 
 // Name returns the name of the Config.
-func (*SDConfig) Name() string { return "marathon" }
+func (*Config) Name() string { return "marathon" }
 
 // NewDiscoverer returns a Discoverer for the Config.
-func (c *SDConfig) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
+func (c *Config) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
 	return NewDiscovery(*c, opts.Logger)
 }
 
 // SetOptions applies the options to the Config.
-func (c *SDConfig) SetOptions(opts discovery.ConfigOptions) {
+func (c *Config) SetOptions(opts discovery.ConfigOptions) {
 	config.SetHTTPClientConfigDirectory(&c.HTTPClientConfig, opts.Directory)
 	c.AuthTokenFile = config.JoinDir(opts.Directory, c.AuthTokenFile)
 }
 
 // Validate checks the Config for errors.
-func (c *SDConfig) Validate() error {
+func (c *Config) Validate() error {
 	return config.ValidateHTTPClientConfig(&c.HTTPClientConfig)
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
-func (c *SDConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	*c = DefaultSDConfig
-	type plain SDConfig
+func (c *Config) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	*c = DefaultConfig
+	type plain Config
 	err := unmarshal((*plain)(c))
 	if err != nil {
 		return err
@@ -132,7 +132,7 @@ type Discovery struct {
 }
 
 // NewDiscovery returns a new Marathon Discovery.
-func NewDiscovery(conf SDConfig, logger log.Logger) (*Discovery, error) {
+func NewDiscovery(conf Config, logger log.Logger) (*Discovery, error) {
 	rt, err := config_util.NewRoundTripperFromConfig(conf.HTTPClientConfig, "marathon_sd", false)
 	if err != nil {
 		return nil, err

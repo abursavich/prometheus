@@ -58,8 +58,8 @@ const (
 	authMethodManagedIdentity = "ManagedIdentity"
 )
 
-// DefaultSDConfig is the default Azure SD configuration.
-var DefaultSDConfig = SDConfig{
+// DefaultConfig is the default Azure SD configuration.
+var DefaultConfig = Config{
 	Port:                 80,
 	RefreshInterval:      model.Duration(5 * time.Minute),
 	Environment:          azure.PublicCloud.Name,
@@ -67,11 +67,11 @@ var DefaultSDConfig = SDConfig{
 }
 
 func init() {
-	config.RegisterServiceDiscovery(&SDConfig{})
+	config.RegisterServiceDiscovery(&Config{})
 }
 
-// SDConfig is the configuration for Azure based service discovery.
-type SDConfig struct {
+// Config is the configuration for Azure based service discovery.
+type Config struct {
 	Environment          string             `yaml:"environment,omitempty"`
 	Port                 int                `yaml:"port"`
 	SubscriptionID       string             `yaml:"subscription_id"`
@@ -83,18 +83,18 @@ type SDConfig struct {
 }
 
 // Name returns the name of the Config.
-func (*SDConfig) Name() string { return "azure" }
+func (*Config) Name() string { return "azure" }
 
 // NewDiscoverer returns a Discoverer for the Config.
-func (c *SDConfig) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
+func (c *Config) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
 	return NewDiscovery(c, opts.Logger), nil
 }
 
 // SetOptions applies the options to the Config.
-func (c *SDConfig) SetOptions(opts discovery.ConfigOptions) {}
+func (c *Config) SetOptions(opts discovery.ConfigOptions) {}
 
 // Validate checks the Config for errors.
-func (*SDConfig) Validate() error { return nil }
+func (*Config) Validate() error { return nil }
 
 func validateAuthParam(param, name string) error {
 	if len(param) == 0 {
@@ -104,9 +104,9 @@ func validateAuthParam(param, name string) error {
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
-func (c *SDConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	*c = DefaultSDConfig
-	type plain SDConfig
+func (c *Config) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	*c = DefaultConfig
+	type plain Config
 	err := unmarshal((*plain)(c))
 	if err != nil {
 		return err
@@ -138,12 +138,12 @@ func (c *SDConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 type Discovery struct {
 	*refresh.Discovery
 	logger log.Logger
-	cfg    *SDConfig
+	cfg    *Config
 	port   int
 }
 
 // NewDiscovery returns a new AzureDiscovery which periodically refreshes its targets.
-func NewDiscovery(cfg *SDConfig, logger log.Logger) *Discovery {
+func NewDiscovery(cfg *Config, logger log.Logger) *Discovery {
 	if logger == nil {
 		logger = log.NewNopLogger()
 	}
@@ -170,7 +170,7 @@ type azureClient struct {
 }
 
 // createAzureClient is a helper function for creating an Azure compute client to ARM.
-func createAzureClient(cfg SDConfig) (azureClient, error) {
+func createAzureClient(cfg Config) (azureClient, error) {
 	env, err := azure.EnvironmentFromName(cfg.Environment)
 	if err != nil {
 		return azureClient{}, err

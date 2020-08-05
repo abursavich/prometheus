@@ -33,19 +33,19 @@ import (
 	"github.com/prometheus/prometheus/discovery/targetgroup"
 )
 
-// DefaultSDConfig is the default OpenStack SD configuration.
-var DefaultSDConfig = SDConfig{
+// DefaultConfig is the default OpenStack SD configuration.
+var DefaultConfig = Config{
 	Port:            80,
 	RefreshInterval: model.Duration(60 * time.Second),
 	Availability:    "public",
 }
 
 func init() {
-	config.RegisterServiceDiscovery(&SDConfig{})
+	config.RegisterServiceDiscovery(&Config{})
 }
 
-// SDConfig is the configuration for OpenStack based service discovery.
-type SDConfig struct {
+// Config is the configuration for OpenStack based service discovery.
+type Config struct {
 	IdentityEndpoint            string                `yaml:"identity_endpoint"`
 	Username                    string                `yaml:"username"`
 	UserID                      string                `yaml:"userid"`
@@ -67,20 +67,20 @@ type SDConfig struct {
 }
 
 // Name returns the name of the Config.
-func (*SDConfig) Name() string { return "openstack" }
+func (*Config) Name() string { return "openstack" }
 
 // NewDiscoverer returns a Discoverer for the Config.
-func (c *SDConfig) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
+func (c *Config) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
 	return NewDiscovery(c, opts.Logger)
 }
 
 // SetOptions applies the options to the Config.
-func (c *SDConfig) SetOptions(opts discovery.ConfigOptions) {
+func (c *Config) SetOptions(opts discovery.ConfigOptions) {
 	config.SetTLSConfigDirectory(&c.TLSConfig, opts.Directory)
 }
 
 // Validate checks the Config for errors.
-func (c *SDConfig) Validate() error {
+func (c *Config) Validate() error {
 	return config.ValidateTLSConfig(&c.TLSConfig)
 }
 
@@ -111,9 +111,9 @@ func (c *Role) UnmarshalYAML(unmarshal func(interface{}) error) error {
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
-func (c *SDConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	*c = DefaultSDConfig
-	type plain SDConfig
+func (c *Config) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	*c = DefaultConfig
+	type plain Config
 	err := unmarshal((*plain)(c))
 	if err != nil {
 		return err
@@ -140,7 +140,7 @@ type refresher interface {
 }
 
 // NewDiscovery returns a new OpenStack Discoverer which periodically refreshes its targets.
-func NewDiscovery(conf *SDConfig, l log.Logger) (*refresh.Discovery, error) {
+func NewDiscovery(conf *Config, l log.Logger) (*refresh.Discovery, error) {
 	r, err := newRefresher(conf, l)
 	if err != nil {
 		return nil, err
@@ -154,7 +154,7 @@ func NewDiscovery(conf *SDConfig, l log.Logger) (*refresh.Discovery, error) {
 
 }
 
-func newRefresher(conf *SDConfig, l log.Logger) (refresher, error) {
+func newRefresher(conf *Config, l log.Logger) (refresher, error) {
 	var opts gophercloud.AuthOptions
 	if conf.IdentityEndpoint == "" {
 		var err error

@@ -41,44 +41,44 @@ import (
 var (
 	patFileSDName = regexp.MustCompile(`^[^*]*(\*[^/]*)?\.(json|yml|yaml|JSON|YML|YAML)$`)
 
-	// DefaultSDConfig is the default file SD configuration.
-	DefaultSDConfig = SDConfig{
+	// DefaultConfig is the default file SD configuration.
+	DefaultConfig = Config{
 		RefreshInterval: model.Duration(5 * time.Minute),
 	}
 )
 
 func init() {
-	config.RegisterServiceDiscovery(&SDConfig{})
+	config.RegisterServiceDiscovery(&Config{})
 }
 
-// SDConfig is the configuration for file based discovery.
-type SDConfig struct {
+// Config is the configuration for file based discovery.
+type Config struct {
 	Files           []string       `yaml:"files"`
 	RefreshInterval model.Duration `yaml:"refresh_interval,omitempty"`
 }
 
 // Name returns the name of the Config.
-func (*SDConfig) Name() string { return "file" }
+func (*Config) Name() string { return "file" }
 
 // NewDiscoverer returns a Discoverer for the Config.
-func (c *SDConfig) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
+func (c *Config) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
 	return NewDiscovery(c, opts.Logger), nil
 }
 
 // SetOptions applies the options to the Config.
-func (c *SDConfig) SetOptions(opts discovery.ConfigOptions) {
+func (c *Config) SetOptions(opts discovery.ConfigOptions) {
 	for i, file := range c.Files {
 		c.Files[i] = config.JoinDir(opts.Directory, file)
 	}
 }
 
 // Validate checks the Config for errors.
-func (*SDConfig) Validate() error { return nil }
+func (*Config) Validate() error { return nil }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
-func (c *SDConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	*c = DefaultSDConfig
-	type plain SDConfig
+func (c *Config) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	*c = DefaultConfig
+	type plain Config
 	err := unmarshal((*plain)(c))
 	if err != nil {
 		return err
@@ -195,7 +195,7 @@ type Discovery struct {
 }
 
 // NewDiscovery returns a new file discovery for the given paths.
-func NewDiscovery(conf *SDConfig, logger log.Logger) *Discovery {
+func NewDiscovery(conf *Config, logger log.Logger) *Discovery {
 	if logger == nil {
 		logger = log.NewNopLogger()
 	}

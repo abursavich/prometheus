@@ -52,19 +52,19 @@ const (
 	gceLabelMachineType    = gceLabel + "machine_type"
 )
 
-// DefaultSDConfig is the default GCE SD configuration.
-var DefaultSDConfig = SDConfig{
+// DefaultConfig is the default GCE SD configuration.
+var DefaultConfig = Config{
 	Port:            80,
 	TagSeparator:    ",",
 	RefreshInterval: model.Duration(60 * time.Second),
 }
 
 func init() {
-	config.RegisterServiceDiscovery(&SDConfig{})
+	config.RegisterServiceDiscovery(&Config{})
 }
 
-// SDConfig is the configuration for GCE based service discovery.
-type SDConfig struct {
+// Config is the configuration for GCE based service discovery.
+type Config struct {
 	// Project: The Google Cloud Project ID
 	Project string `yaml:"project"`
 
@@ -83,23 +83,23 @@ type SDConfig struct {
 }
 
 // Name returns the name of the Config.
-func (*SDConfig) Name() string { return "gce" }
+func (*Config) Name() string { return "gce" }
 
 // NewDiscoverer returns a Discoverer for the Config.
-func (c *SDConfig) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
+func (c *Config) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
 	return NewDiscovery(*c, opts.Logger)
 }
 
 // SetOptions applies the options to the Config.
-func (c *SDConfig) SetOptions(opts discovery.ConfigOptions) {}
+func (c *Config) SetOptions(opts discovery.ConfigOptions) {}
 
 // Validate checks the Config for errors.
-func (*SDConfig) Validate() error { return nil }
+func (*Config) Validate() error { return nil }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
-func (c *SDConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	*c = DefaultSDConfig
-	type plain SDConfig
+func (c *Config) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	*c = DefaultConfig
+	type plain Config
 	err := unmarshal((*plain)(c))
 	if err != nil {
 		return err
@@ -128,7 +128,7 @@ type Discovery struct {
 }
 
 // NewDiscovery returns a new Discovery which periodically refreshes its targets.
-func NewDiscovery(conf SDConfig, logger log.Logger) (*Discovery, error) {
+func NewDiscovery(conf Config, logger log.Logger) (*Discovery, error) {
 	d := &Discovery{
 		project:      conf.Project,
 		zone:         conf.Zone,

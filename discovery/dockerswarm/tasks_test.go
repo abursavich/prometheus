@@ -35,7 +35,7 @@ func TestDockerSwarmTasksSDRefresh(t *testing.T) {
 role: tasks
 host: %s
 `, url)
-	var cfg SDConfig
+	var cfg Config
 	testutil.Ok(t, yaml.Unmarshal([]byte(cfgString), &cfg))
 
 	d, err := NewDiscovery(&cfg, log.NewNopLogger())

@@ -31,7 +31,7 @@ import (
 )
 
 var (
-	conf = SDConfig{
+	conf = Config{
 		Account:         "testAccount",
 		Role:            "container",
 		DNSSuffix:       "triton.example.com",
@@ -41,7 +41,7 @@ var (
 		RefreshInterval: 1,
 		TLSConfig:       config.TLSConfig{InsecureSkipVerify: true},
 	}
-	badconf = SDConfig{
+	badconf = Config{
 		Account:         "badTestAccount",
 		Role:            "container",
 		DNSSuffix:       "bad.triton.example.com",
@@ -56,7 +56,7 @@ var (
 			CertFile:           "shouldnotexist.cert",
 		},
 	}
-	groupsconf = SDConfig{
+	groupsconf = Config{
 		Account:         "testAccount",
 		Role:            "container",
 		DNSSuffix:       "triton.example.com",
@@ -67,7 +67,7 @@ var (
 		RefreshInterval: 1,
 		TLSConfig:       config.TLSConfig{InsecureSkipVerify: true},
 	}
-	cnconf = SDConfig{
+	cnconf = Config{
 		Account:         "testAccount",
 		Role:            "cn",
 		DNSSuffix:       "triton.example.com",
@@ -79,7 +79,7 @@ var (
 	}
 )
 
-func newTritonDiscovery(c SDConfig) (*Discovery, error) {
+func newTritonDiscovery(c Config) (*Discovery, error) {
 	return New(nil, &c)
 }
 
@@ -89,11 +89,11 @@ func TestTritonSDNew(t *testing.T) {
 	testutil.Assert(t, td != nil, "")
 	testutil.Assert(t, td.client != nil, "")
 	testutil.Assert(t, td.interval != 0, "")
-	testutil.Assert(t, td.sdConfig != nil, "")
-	testutil.Equals(t, conf.Account, td.sdConfig.Account)
-	testutil.Equals(t, conf.DNSSuffix, td.sdConfig.DNSSuffix)
-	testutil.Equals(t, conf.Endpoint, td.sdConfig.Endpoint)
-	testutil.Equals(t, conf.Port, td.sdConfig.Port)
+	testutil.Assert(t, td.config != nil, "")
+	testutil.Equals(t, conf.Account, td.config.Account)
+	testutil.Equals(t, conf.DNSSuffix, td.config.DNSSuffix)
+	testutil.Equals(t, conf.Endpoint, td.config.Endpoint)
+	testutil.Equals(t, conf.Port, td.config.Port)
 }
 
 func TestTritonSDNewBadConfig(t *testing.T) {
@@ -108,12 +108,12 @@ func TestTritonSDNewGroupsConfig(t *testing.T) {
 	testutil.Assert(t, td != nil, "")
 	testutil.Assert(t, td.client != nil, "")
 	testutil.Assert(t, td.interval != 0, "")
-	testutil.Assert(t, td.sdConfig != nil, "")
-	testutil.Equals(t, groupsconf.Account, td.sdConfig.Account)
-	testutil.Equals(t, groupsconf.DNSSuffix, td.sdConfig.DNSSuffix)
-	testutil.Equals(t, groupsconf.Endpoint, td.sdConfig.Endpoint)
-	testutil.Equals(t, groupsconf.Groups, td.sdConfig.Groups)
-	testutil.Equals(t, groupsconf.Port, td.sdConfig.Port)
+	testutil.Assert(t, td.config != nil, "")
+	testutil.Equals(t, groupsconf.Account, td.config.Account)
+	testutil.Equals(t, groupsconf.DNSSuffix, td.config.DNSSuffix)
+	testutil.Equals(t, groupsconf.Endpoint, td.config.Endpoint)
+	testutil.Equals(t, groupsconf.Groups, td.config.Groups)
+	testutil.Equals(t, groupsconf.Port, td.config.Port)
 }
 
 func TestTritonSDNewCNConfig(t *testing.T) {
@@ -122,12 +122,12 @@ func TestTritonSDNewCNConfig(t *testing.T) {
 	testutil.Assert(t, td != nil, "")
 	testutil.Assert(t, td.client != nil, "")
 	testutil.Assert(t, td.interval != 0, "")
-	testutil.Assert(t, td.sdConfig != nil, "")
-	testutil.Equals(t, cnconf.Role, td.sdConfig.Role)
-	testutil.Equals(t, cnconf.Account, td.sdConfig.Account)
-	testutil.Equals(t, cnconf.DNSSuffix, td.sdConfig.DNSSuffix)
-	testutil.Equals(t, cnconf.Endpoint, td.sdConfig.Endpoint)
-	testutil.Equals(t, cnconf.Port, td.sdConfig.Port)
+	testutil.Assert(t, td.config != nil, "")
+	testutil.Equals(t, cnconf.Role, td.config.Role)
+	testutil.Equals(t, cnconf.Account, td.config.Account)
+	testutil.Equals(t, cnconf.DNSSuffix, td.config.DNSSuffix)
+	testutil.Equals(t, cnconf.Endpoint, td.config.Endpoint)
+	testutil.Equals(t, cnconf.Port, td.config.Port)
 }
 
 func TestTritonSDRefreshNoTargets(t *testing.T) {
@@ -219,7 +219,7 @@ func TestTritonSDRefreshCNsWithHostname(t *testing.T) {
 	testutil.Equals(t, 2, len(tgts))
 }
 
-func testTritonSDRefresh(t *testing.T, c SDConfig, dstr string) []model.LabelSet {
+func testTritonSDRefresh(t *testing.T, c Config, dstr string) []model.LabelSet {
 	var (
 		td, _ = newTritonDiscovery(c)
 		s     = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -242,7 +242,7 @@ func testTritonSDRefresh(t *testing.T, c SDConfig, dstr string) []model.LabelSet
 	testutil.Ok(t, err)
 	testutil.Assert(t, port != 0, "")
 
-	td.sdConfig.Port = port
+	td.config.Port = port
 
 	tgs, err := td.refresh(context.Background())
 	testutil.Ok(t, err)

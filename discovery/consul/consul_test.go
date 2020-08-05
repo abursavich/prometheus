@@ -34,7 +34,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestConfiguredService(t *testing.T) {
-	conf := &SDConfig{
+	conf := &Config{
 		Services: []string{"configuredServiceName"}}
 	consulDiscovery, err := NewDiscovery(conf, nil)
 
@@ -50,7 +50,7 @@ func TestConfiguredService(t *testing.T) {
 }
 
 func TestConfiguredServiceWithTag(t *testing.T) {
-	conf := &SDConfig{
+	conf := &Config{
 		Services:    []string{"configuredServiceName"},
 		ServiceTags: []string{"http"},
 	}
@@ -76,7 +76,7 @@ func TestConfiguredServiceWithTag(t *testing.T) {
 func TestConfiguredServiceWithTags(t *testing.T) {
 	type testcase struct {
 		// What we've configured to watch.
-		conf *SDConfig
+		conf *Config
 		// The service we're checking if we should watch or not.
 		serviceName string
 		serviceTags []string
@@ -85,7 +85,7 @@ func TestConfiguredServiceWithTags(t *testing.T) {
 
 	cases := []testcase{
 		{
-			conf: &SDConfig{
+			conf: &Config{
 				Services:    []string{"configuredServiceName"},
 				ServiceTags: []string{"http", "v1"},
 			},
@@ -94,7 +94,7 @@ func TestConfiguredServiceWithTags(t *testing.T) {
 			shouldWatch: false,
 		},
 		{
-			conf: &SDConfig{
+			conf: &Config{
 				Services:    []string{"configuredServiceName"},
 				ServiceTags: []string{"http", "v1"},
 			},
@@ -103,7 +103,7 @@ func TestConfiguredServiceWithTags(t *testing.T) {
 			shouldWatch: true,
 		},
 		{
-			conf: &SDConfig{
+			conf: &Config{
 				Services:    []string{"configuredServiceName"},
 				ServiceTags: []string{"http", "v1"},
 			},
@@ -112,7 +112,7 @@ func TestConfiguredServiceWithTags(t *testing.T) {
 			shouldWatch: false,
 		},
 		{
-			conf: &SDConfig{
+			conf: &Config{
 				Services:    []string{"configuredServiceName"},
 				ServiceTags: []string{"http", "v1"},
 			},
@@ -121,7 +121,7 @@ func TestConfiguredServiceWithTags(t *testing.T) {
 			shouldWatch: false,
 		},
 		{
-			conf: &SDConfig{
+			conf: &Config{
 				Services:    []string{"configuredServiceName"},
 				ServiceTags: []string{"http", "v1"},
 			},
@@ -130,7 +130,7 @@ func TestConfiguredServiceWithTags(t *testing.T) {
 			shouldWatch: true,
 		},
 		{
-			conf: &SDConfig{
+			conf: &Config{
 				Services:    []string{"configuredServiceName"},
 				ServiceTags: []string{"http", "v1", "foo"},
 			},
@@ -139,7 +139,7 @@ func TestConfiguredServiceWithTags(t *testing.T) {
 			shouldWatch: true,
 		},
 		{
-			conf: &SDConfig{
+			conf: &Config{
 				Services:    []string{"configuredServiceName"},
 				ServiceTags: []string{"http", "v1"},
 			},
@@ -164,7 +164,7 @@ func TestConfiguredServiceWithTags(t *testing.T) {
 }
 
 func TestNonConfiguredService(t *testing.T) {
-	conf := &SDConfig{}
+	conf := &Config{}
 	consulDiscovery, err := NewDiscovery(conf, nil)
 
 	if err != nil {
@@ -221,7 +221,7 @@ const (
 	ServicesTestAnswer = `{"test": ["tag1"], "other": ["tag2"]}`
 )
 
-func newServer(t *testing.T) (*httptest.Server, *SDConfig) {
+func newServer(t *testing.T) (*httptest.Server, *Config) {
 	// github.com/hashicorp/consul/testutil/ would be nice but it needs a local consul binary.
 	stub := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		response := ""
@@ -253,7 +253,7 @@ func newServer(t *testing.T) (*httptest.Server, *SDConfig) {
 	stuburl, err := url.Parse(stub.URL)
 	testutil.Ok(t, err)
 
-	config := &SDConfig{
+	config := &Config{
 		Server:          stuburl.Host,
 		Token:           "fake-token",
 		RefreshInterval: model.Duration(1 * time.Second),
@@ -261,7 +261,7 @@ func newServer(t *testing.T) (*httptest.Server, *SDConfig) {
 	return stub, config
 }
 
-func newDiscovery(t *testing.T, config *SDConfig) *Discovery {
+func newDiscovery(t *testing.T, config *Config) *Discovery {
 	logger := log.NewNopLogger()
 	d, err := NewDiscovery(config, logger)
 	testutil.Ok(t, err)
@@ -361,7 +361,7 @@ func TestGetDatacenterShouldReturnError(t *testing.T) {
 		stuburl, err := url.Parse(stub.URL)
 		testutil.Ok(t, err)
 
-		config := &SDConfig{
+		config := &Config{
 			Server:          stuburl.Host,
 			Token:           "fake-token",
 			RefreshInterval: model.Duration(1 * time.Second),

@@ -50,18 +50,18 @@ const (
 	separator          = ","
 )
 
-// DefaultSDConfig is the default DigitalOcean SD configuration.
-var DefaultSDConfig = SDConfig{
+// DefaultConfig is the default DigitalOcean SD configuration.
+var DefaultConfig = Config{
 	Port:            80,
 	RefreshInterval: model.Duration(60 * time.Second),
 }
 
 func init() {
-	config.RegisterServiceDiscovery(&SDConfig{})
+	config.RegisterServiceDiscovery(&Config{})
 }
 
-// SDConfig is the configuration for DigitalOcean based service discovery.
-type SDConfig struct {
+// Config is the configuration for DigitalOcean based service discovery.
+type Config struct {
 	HTTPClientConfig config_util.HTTPClientConfig `yaml:",inline"`
 
 	RefreshInterval model.Duration `yaml:"refresh_interval"`
@@ -69,27 +69,27 @@ type SDConfig struct {
 }
 
 // Name returns the name of the Config.
-func (*SDConfig) Name() string { return "digitalocean" }
+func (*Config) Name() string { return "digitalocean" }
 
 // NewDiscoverer returns a Discoverer for the Config.
-func (c *SDConfig) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
+func (c *Config) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
 	return NewDiscovery(c, opts.Logger)
 }
 
 // SetOptions applies the options to the Config.
-func (c *SDConfig) SetOptions(opts discovery.ConfigOptions) {
+func (c *Config) SetOptions(opts discovery.ConfigOptions) {
 	config.SetHTTPClientConfigDirectory(&c.HTTPClientConfig, opts.Directory)
 }
 
 // Validate checks the Config for errors.
-func (c *SDConfig) Validate() error {
+func (c *Config) Validate() error {
 	return config.ValidateHTTPClientConfig(&c.HTTPClientConfig)
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
-func (c *SDConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	*c = DefaultSDConfig
-	type plain SDConfig
+func (c *Config) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	*c = DefaultConfig
+	type plain Config
 	err := unmarshal((*plain)(c))
 	if err != nil {
 		return err
@@ -106,7 +106,7 @@ type Discovery struct {
 }
 
 // NewDiscovery returns a new Discovery which periodically refreshes its targets.
-func NewDiscovery(conf *SDConfig, logger log.Logger) (*Discovery, error) {
+func NewDiscovery(conf *Config, logger log.Logger) (*Discovery, error) {
 	d := &Discovery{
 		port: conf.Port,
 	}

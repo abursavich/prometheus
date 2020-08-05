@@ -36,7 +36,7 @@ func (s *OpenstackSDHypervisorTestSuite) SetupTest(t *testing.T) {
 }
 
 func (s *OpenstackSDHypervisorTestSuite) openstackAuthSuccess() (refresher, error) {
-	conf := SDConfig{
+	conf := Config{
 		IdentityEndpoint: s.Mock.Endpoint(),
 		Password:         "test",
 		Username:         "test",

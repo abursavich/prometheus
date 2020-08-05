@@ -60,21 +60,21 @@ var (
 			Help:      "The number of DNS-SD lookup failures.",
 		})
 
-	// DefaultSDConfig is the default DNS SD configuration.
-	DefaultSDConfig = SDConfig{
+	// DefaultConfig is the default DNS SD configuration.
+	DefaultConfig = Config{
 		RefreshInterval: model.Duration(30 * time.Second),
 		Type:            "SRV",
 	}
 )
 
 func init() {
-	config.RegisterServiceDiscovery(&SDConfig{})
+	config.RegisterServiceDiscovery(&Config{})
 	prometheus.MustRegister(dnsSDLookupFailuresCount)
 	prometheus.MustRegister(dnsSDLookupsCount)
 }
 
-// SDConfig is the configuration for DNS based service discovery.
-type SDConfig struct {
+// Config is the configuration for DNS based service discovery.
+type Config struct {
 	Names           []string       `yaml:"names"`
 	RefreshInterval model.Duration `yaml:"refresh_interval,omitempty"`
 	Type            string         `yaml:"type"`
@@ -82,23 +82,23 @@ type SDConfig struct {
 }
 
 // Name returns the name of the Config.
-func (*SDConfig) Name() string { return "dns" }
+func (*Config) Name() string { return "dns" }
 
 // NewDiscoverer returns a Discoverer for the Config.
-func (c *SDConfig) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
+func (c *Config) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
 	return NewDiscovery(*c, opts.Logger), nil
 }
 
 // SetOptions applies the options to the Config.
-func (c *SDConfig) SetOptions(opts discovery.ConfigOptions) {}
+func (c *Config) SetOptions(opts discovery.ConfigOptions) {}
 
 // Validate checks the Config for errors.
-func (*SDConfig) Validate() error { return nil }
+func (*Config) Validate() error { return nil }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
-func (c *SDConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	*c = DefaultSDConfig
-	type plain SDConfig
+func (c *Config) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	*c = DefaultConfig
+	type plain Config
 	err := unmarshal((*plain)(c))
 	if err != nil {
 		return err
@@ -131,7 +131,7 @@ type Discovery struct {
 }
 
 // NewDiscovery returns a new Discovery which periodically refreshes its targets.
-func NewDiscovery(conf SDConfig, logger log.Logger) *Discovery {
+func NewDiscovery(conf Config, logger log.Logger) *Discovery {
 	if logger == nil {
 		logger = log.NewNopLogger()
 	}
