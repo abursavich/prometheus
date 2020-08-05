@@ -19,10 +19,12 @@ import (
 	"net/url"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	config_util "github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
 	"gopkg.in/yaml.v2"
@@ -711,6 +713,52 @@ var expectedConf = &Config{
 			},
 		},
 	},
+}
+
+func assertConfigsEqual(t *testing.T, want, got interface{}) {
+	cmpOpts := []cmp.Option{
+		cmp.Comparer(func(x, y relabel.Regexp) bool {
+			// Regexps have unexported state.
+			return x.String() == y.String()
+		}),
+		cmp.Comparer(func(x, y config_util.Secret) bool {
+			// Secrets are marshaled as "<secret>" and can't be compared
+			// to the original. We just compare if they exist.
+			return (x == "") == (y == "")
+		}),
+		cmp.Transformer("discovery.Config.Sorter", func(cfgs []discoverer.Config) []discoverer.Config {
+			// The service discovery configs are marshaled and unmarshaled
+			// in a particular order, sorted by their names and with
+			// static_configs always at the end.
+			//
+			// At the time of writing this comment, all of the test configs
+			// are in this expected order, but adding this tranformer protects
+			// future test writers from going mad over inexplicably failed
+			// comparisons between unmarshaled yaml configs and hand-crafted
+			// go values (with configs in the "wrong" order).
+			clone := append(make([]discoverer.Config, 0, len(cfgs)), cfgs...)
+			sort.SliceStable(clone, func(i, k int) bool {
+				return clone[i].Name() < clone[k].Name()
+			})
+			return clone
+		}),
+	}
+	if diff := cmp.Diff(want, got, cmpOpts...); diff != "" {
+		t.Fatalf("unexpected diff:\n\n%v", diff)
+	}
+}
+
+func TestYAMLRoundtrip(t *testing.T) {
+	want, err := LoadFile("testdata/conf.good.yml")
+	testutil.Ok(t, err)
+
+	out, err := yaml.Marshal(want)
+	testutil.Ok(t, err)
+
+	got := &Config{}
+	testutil.Ok(t, yaml.UnmarshalStrict(out, got))
+
+	assertConfigsEqual(t, want, got)
 }
 
 func TestLoadConfig(t *testing.T) {
