@@ -30,6 +30,7 @@ import (
 	"github.com/prometheus/prometheus/discovery"
 	"github.com/prometheus/prometheus/pkg/labels"
 	"github.com/prometheus/prometheus/pkg/relabel"
+	"github.com/prometheus/prometheus/pkg/rulefmt"
 )
 
 var (
@@ -185,13 +186,59 @@ func (c *Config) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	if err := unmarshal((*plain)(c)); err != nil {
 		return err
 	}
+	return c.validate()
+}
+
+// Validate returns an error if it can determine that the config will fail when used.
+func (c *Config) Validate() error {
+	if err := c.validate(); err != nil {
+		return err
+	}
+	if err := c.GlobalConfig.Validate(); err != nil {
+		return err
+	}
+	if err := c.AlertingConfig.Validate(); err != nil {
+		return err
+	}
+	for _, pattern := range c.RuleFiles {
+		files, err := filepath.Glob(pattern)
+		if err != nil {
+			return err
+		}
+		// TODO(abursavich): Do we care if there are no matching files?
+		for _, file := range files {
+			if _, errs := rulefmt.ParseFile(file); len(errs) > 0 {
+				return errs[0] // TODO(abursavich): Join errors?
+			}
+			// TODO(abursavich): Other checks on content of rule files?
+		}
+	}
+	for _, cfg := range c.ScrapeConfigs {
+		if err := cfg.Validate(); err != nil {
+			return err
+		}
+	}
+	for _, cfg := range c.RemoteWriteConfigs {
+		if err := cfg.Validate(); err != nil {
+			return err
+		}
+	}
+	for _, cfg := range c.RemoteReadConfigs {
+		if err := cfg.Validate(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *Config) validate() error {
+	// TODO(abursavich): Setting of overrides probably shouldn't be here. Return to UnmarshalYAML?
 
 	// If a global block was open but empty the default global config is overwritten.
 	// We have to restore it here.
 	if c.GlobalConfig.isZero() {
 		c.GlobalConfig = DefaultGlobalConfig
 	}
-
 	for _, rf := range c.RuleFiles {
 		if !patRulePath.MatchString(rf) {
 			return errors.Errorf("invalid rule file path %q", rf)
@@ -268,13 +315,21 @@ type GlobalConfig struct {
 func (c *GlobalConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	// Create a clean global config as the previous one was already populated
 	// by the default due to the YAML parser behavior for empty blocks.
-	gc := &GlobalConfig{}
+	v := &GlobalConfig{}
 	type plain GlobalConfig
-	if err := unmarshal((*plain)(gc)); err != nil {
+	if err := unmarshal((*plain)(v)); err != nil {
 		return err
 	}
+	if err := v.Validate(); err != nil {
+		return err
+	}
+	*c = *v
+	return nil
+}
 
-	for _, l := range gc.ExternalLabels {
+// Validate returns an error if it can determine that the config will fail when used.
+func (c *GlobalConfig) Validate() error {
+	for _, l := range c.ExternalLabels {
 		if !model.LabelName(l.Name).IsValid() {
 			return errors.Errorf("%q is not a valid label name", l.Name)
 		}
@@ -282,26 +337,24 @@ func (c *GlobalConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 			return errors.Errorf("%q is not a valid label value", l.Value)
 		}
 	}
-
 	// First set the correct scrape interval, then check that the timeout
 	// (inferred or explicit) is not greater than that.
-	if gc.ScrapeInterval == 0 {
-		gc.ScrapeInterval = DefaultGlobalConfig.ScrapeInterval
+	if c.ScrapeInterval == 0 {
+		c.ScrapeInterval = DefaultGlobalConfig.ScrapeInterval
 	}
-	if gc.ScrapeTimeout > gc.ScrapeInterval {
+	if c.ScrapeTimeout > c.ScrapeInterval {
 		return errors.New("global scrape timeout greater than scrape interval")
 	}
-	if gc.ScrapeTimeout == 0 {
-		if DefaultGlobalConfig.ScrapeTimeout > gc.ScrapeInterval {
-			gc.ScrapeTimeout = gc.ScrapeInterval
+	if c.ScrapeTimeout == 0 {
+		if DefaultGlobalConfig.ScrapeTimeout > c.ScrapeInterval {
+			c.ScrapeTimeout = c.ScrapeInterval
 		} else {
-			gc.ScrapeTimeout = DefaultGlobalConfig.ScrapeTimeout
+			c.ScrapeTimeout = DefaultGlobalConfig.ScrapeTimeout
 		}
 	}
-	if gc.EvaluationInterval == 0 {
-		gc.EvaluationInterval = DefaultGlobalConfig.EvaluationInterval
+	if c.EvaluationInterval == 0 {
+		c.EvaluationInterval = DefaultGlobalConfig.EvaluationInterval
 	}
-	*c = *gc
 	return nil
 }
 
@@ -356,24 +409,37 @@ func (c *ScrapeConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	if err := discovery.UnmarshalYAMLWithInlineConfigs(c, unmarshal); err != nil {
 		return err
 	}
+	return c.validate()
+}
+
+// Validate returns an error if it can determine that the config will fail when used.
+func (c *ScrapeConfig) Validate() error {
+	if err := c.validate(); err != nil {
+		return nil
+	}
+	if err := ValidateHTTPClientConfig(&c.HTTPClientConfig); err != nil {
+		return err
+	}
+	for _, cfg := range c.ServiceDiscoveryConfigs {
+		if v, ok := cfg.(Validater); ok {
+			if err := v.Validate(); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (c *ScrapeConfig) validate() error {
 	if len(c.JobName) == 0 {
 		return errors.New("job_name is empty")
 	}
-
-	// The UnmarshalYAML method of HTTPClientConfig is not being called because it's not a pointer.
-	// We cannot make it a pointer as the parser panics for inlined pointer structs.
-	// Thus we just do its validation here.
-	if err := c.HTTPClientConfig.Validate(); err != nil {
-		return err
-	}
-
 	// Check for users putting URLs in target groups.
 	if len(c.RelabelConfigs) == 0 {
 		if err := checkStaticTargets(c.ServiceDiscoveryConfigs); err != nil {
 			return err
 		}
 	}
-
 	for _, rlcfg := range c.RelabelConfigs {
 		if rlcfg == nil {
 			return errors.New("empty or null target relabeling rule in scrape config")
@@ -384,7 +450,6 @@ func (c *ScrapeConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 			return errors.New("empty or null metric relabeling rule in scrape config")
 		}
 	}
-
 	return nil
 }
 
@@ -408,7 +473,11 @@ func (c *AlertingConfig) UnmarshalYAML(unmarshal func(interface{}) error) error 
 	if err := unmarshal((*plain)(c)); err != nil {
 		return err
 	}
+	return c.Validate()
+}
 
+// Validate returns an error if it can determine that the config will fail when used.
+func (c *AlertingConfig) Validate() error {
 	for _, rlcfg := range c.AlertRelabelConfigs {
 		if rlcfg == nil {
 			return errors.New("empty or null alert relabeling rule")
@@ -440,13 +509,16 @@ func (v *AlertmanagerAPIVersion) UnmarshalYAML(unmarshal func(interface{}) error
 	if err := unmarshal((*plain)(v)); err != nil {
 		return err
 	}
+	return v.Validate()
+}
 
+// Validate returns an error if it can determine that the config will fail when used.
+func (v *AlertmanagerAPIVersion) Validate() error {
 	for _, supportedVersion := range SupportedAlertmanagerAPIVersions {
 		if *v == supportedVersion {
 			return nil
 		}
 	}
-
 	return fmt.Errorf("expected Alertmanager api version to be one of %v but got %v", SupportedAlertmanagerAPIVersions, *v)
 }
 
@@ -491,33 +563,48 @@ func (c *AlertmanagerConfig) UnmarshalYAML(unmarshal func(interface{}) error) er
 	if err := discovery.UnmarshalYAMLWithInlineConfigs(c, unmarshal); err != nil {
 		return err
 	}
+	return c.validate()
+}
 
-	// The UnmarshalYAML method of HTTPClientConfig is not being called because it's not a pointer.
-	// We cannot make it a pointer as the parser panics for inlined pointer structs.
-	// Thus we just do its validation here.
-	if err := c.HTTPClientConfig.Validate(); err != nil {
+// MarshalYAML implements the yaml.Marshaler interface.
+func (c *AlertmanagerConfig) MarshalYAML() (interface{}, error) {
+	return discovery.MarshalYAMLWithInlineConfigs(c)
+}
+
+// Validate returns an error if it can determine that the config will fail when used.
+func (c *AlertmanagerConfig) Validate() error {
+	if err := c.validate(); err != nil {
 		return err
 	}
+	if err := c.APIVersion.Validate(); err != nil {
+		return err
+	}
+	if err := ValidateHTTPClientConfig(&c.HTTPClientConfig); err != nil {
+		return err
+	}
+	for _, cfg := range c.ServiceDiscoveryConfigs {
+		if v, ok := cfg.(Validater); ok {
+			if err := v.Validate(); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
 
+func (c *AlertmanagerConfig) validate() error {
 	// Check for users putting URLs in target groups.
 	if len(c.RelabelConfigs) == 0 {
 		if err := checkStaticTargets(c.ServiceDiscoveryConfigs); err != nil {
 			return err
 		}
 	}
-
 	for _, rlcfg := range c.RelabelConfigs {
 		if rlcfg == nil {
 			return errors.New("empty or null Alertmanager target relabeling rule")
 		}
 	}
-
 	return nil
-}
-
-// MarshalYAML implements the yaml.Marshaler interface.
-func (c *AlertmanagerConfig) MarshalYAML() (interface{}, error) {
-	return discovery.MarshalYAMLWithInlineConfigs(c)
 }
 
 func checkStaticTargets(configs discovery.Configs) error {
@@ -566,6 +653,19 @@ func (c *RemoteWriteConfig) UnmarshalYAML(unmarshal func(interface{}) error) err
 	if err := unmarshal((*plain)(c)); err != nil {
 		return err
 	}
+	return c.validate()
+}
+
+// Validate returns an error if it can determine that the config will fail when used.
+func (c *RemoteWriteConfig) Validate() error {
+	if err := c.validate(); err != nil {
+		return err
+	}
+	// TODO: validate QueueConfig?
+	return ValidateHTTPClientConfig(&c.HTTPClientConfig)
+}
+
+func (c *RemoteWriteConfig) validate() error {
 	if c.URL == nil {
 		return errors.New("url for remote_write is empty")
 	}
@@ -574,11 +674,7 @@ func (c *RemoteWriteConfig) UnmarshalYAML(unmarshal func(interface{}) error) err
 			return errors.New("empty or null relabeling rule in remote write config")
 		}
 	}
-
-	// The UnmarshalYAML method of HTTPClientConfig is not being called because it's not a pointer.
-	// We cannot make it a pointer as the parser panics for inlined pointer structs.
-	// Thus we just do its validation here.
-	return c.HTTPClientConfig.Validate()
+	return nil
 }
 
 // QueueConfig is the configuration for the queue used to write to remote
@@ -628,11 +724,20 @@ func (c *RemoteReadConfig) UnmarshalYAML(unmarshal func(interface{}) error) erro
 	if err := unmarshal((*plain)(c)); err != nil {
 		return err
 	}
+	return c.validate()
+}
+
+// Validate returns an error if it can determine that the config will fail when used.
+func (c *RemoteReadConfig) Validate() error {
+	if err := c.validate(); err != nil {
+		return err
+	}
+	return ValidateHTTPClientConfig(&c.HTTPClientConfig)
+}
+
+func (c *RemoteReadConfig) validate() error {
 	if c.URL == nil {
 		return errors.New("url for remote_read is empty")
 	}
-	// The UnmarshalYAML method of HTTPClientConfig is not being called because it's not a pointer.
-	// We cannot make it a pointer as the parser panics for inlined pointer structs.
-	// Thus we just do its validation here.
-	return c.HTTPClientConfig.Validate()
+	return nil
 }

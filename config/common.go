@@ -21,6 +21,14 @@ import (
 	"github.com/prometheus/common/config"
 )
 
+// Validater provides a mechanism to reject configs before they are used.
+type Validater interface {
+	// Validate returns an error if it can determine that a config
+	// will fail when used. For example, it may reference missing
+	// or invalid files.
+	Validate() error
+}
+
 // JoinDir joins dir and path if path is relative.
 // If path is empty or absolute, it is returned unchanged.
 func JoinDir(dir, path string) string {
