@@ -40,7 +40,6 @@ import (
 
 	"github.com/prometheus/prometheus/config"
 	"github.com/prometheus/prometheus/discovery/file"
-	"github.com/prometheus/prometheus/discovery/kubernetes"
 	"github.com/prometheus/prometheus/pkg/rulefmt"
 
 	_ "github.com/prometheus/prometheus/discovery/install" // Register service discovery implementations.
@@ -193,102 +192,68 @@ func main() {
 func CheckConfig(files ...string) int {
 	failed := false
 
-	for _, f := range files {
-		ruleFiles, err := checkConfig(f)
+	for _, fname := range files {
+		fmt.Println("Checking", fname)
+		cfg, err := config.LoadFile(fname)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "  FAILED:", err)
 			failed = true
-		} else {
-			fmt.Printf("  SUCCESS: %d rule files found\n", len(ruleFiles))
+			continue
 		}
-		fmt.Println()
-
-		for _, rf := range ruleFiles {
-			if n, errs := checkRules(rf); len(errs) > 0 {
-				fmt.Fprintln(os.Stderr, "  FAILED:")
-				for _, err := range errs {
-					fmt.Fprintln(os.Stderr, "    ", err)
+		if err := cfg.Validate(); err != nil {
+			fmt.Fprintln(os.Stderr, "  FAILED:", err)
+			failed = true
+		}
+		// Create warnings for file discovery configs that don't match files.
+		for _, scfg := range cfg.ScrapeConfigs {
+			for _, c := range scfg.ServiceDiscoveryConfigs {
+				v, ok := c.(*file.SDConfig)
+				if !ok {
+					continue
 				}
-				failed = true
-			} else {
-				fmt.Printf("  SUCCESS: %d rules found\n", n)
+				for _, glob := range v.Files {
+					files, err := filepath.Glob(glob)
+					if err != nil {
+						fmt.Fprintln(os.Stderr, "  FAILED:", err)
+						failed = true
+						continue
+					}
+					if len(files) != 0 {
+						// There was at least one match for the glob.
+						continue
+					}
+					fmt.Printf("  WARNING: file %q for file_sd in scrape job %q does not exist\n", glob, scfg.JobName)
+				}
 			}
-			fmt.Println()
+		}
+		// Check rule files.
+		for _, glob := range cfg.RuleFiles {
+			files, err := filepath.Glob(glob)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "  FAILED:", err)
+				failed = true
+				continue
+			}
+			// If an explicit file was given, error if it is not accessible.
+			if len(files) == 0 && !strings.Contains(glob, "*") {
+				fmt.Fprintf(os.Stderr, "  FAILED: %q does not point to an existing file\n", glob)
+				failed = true
+				continue
+			}
+			for _, file := range files {
+				_, errs := checkRules(file)
+				for _, err := range errs {
+					fmt.Fprintln(os.Stderr, "  FAILED:", err)
+					failed = true
+				}
+			}
 		}
 	}
+
 	if failed {
 		return 1
 	}
 	return 0
-}
-
-func checkFileExists(fn string) error {
-	// Nothing set, nothing to error on.
-	if fn == "" {
-		return nil
-	}
-	_, err := os.Stat(fn)
-	return err
-}
-
-func checkConfig(filename string) ([]string, error) {
-	fmt.Println("Checking", filename)
-
-	cfg, err := config.LoadFile(filename)
-	if err != nil {
-		return nil, err
-	}
-
-	var ruleFiles []string
-	for _, rf := range cfg.RuleFiles {
-		rfs, err := filepath.Glob(rf)
-		if err != nil {
-			return nil, err
-		}
-		// If an explicit file was given, error if it is not accessible.
-		if !strings.Contains(rf, "*") {
-			if len(rfs) == 0 {
-				return nil, errors.Errorf("%q does not point to an existing file", rf)
-			}
-			if err := checkFileExists(rfs[0]); err != nil {
-				return nil, errors.Wrapf(err, "error checking rule file %q", rfs[0])
-			}
-		}
-		ruleFiles = append(ruleFiles, rfs...)
-	}
-
-	for _, scfg := range cfg.ScrapeConfigs {
-		if err := checkFileExists(scfg.HTTPClientConfig.BearerTokenFile); err != nil {
-			return nil, errors.Wrapf(err, "error checking bearer token file %q", scfg.HTTPClientConfig.BearerTokenFile)
-		}
-		if err := config.ValidateTLSConfig(&scfg.HTTPClientConfig.TLSConfig); err != nil {
-			return nil, err
-		}
-
-		for _, c := range scfg.ServiceDiscoveryConfigs {
-			switch c := c.(type) {
-			case *kubernetes.SDConfig:
-				if err := config.ValidateTLSConfig(&c.HTTPClientConfig.TLSConfig); err != nil {
-					return nil, err
-				}
-			case *file.SDConfig:
-				for _, file := range c.Files {
-					files, err := filepath.Glob(file)
-					if err != nil {
-						return nil, err
-					}
-					if len(files) != 0 {
-						// There was at least one match for the glob and we can assume checkFileExists
-						// for all matches would pass, we can continue the loop.
-						continue
-					}
-					fmt.Printf("  WARNING: file %q for file_sd in scrape job %q does not exist\n", file, scfg.JobName)
-				}
-			}
-		}
-	}
-
-	return ruleFiles, nil
 }
 
 // CheckRules validates rule files.
