@@ -57,6 +57,10 @@ func main() {
 		"config-files",
 		"The config files to check.",
 	).Required().ExistingFiles()
+	syntaxOnly := checkConfigCmd.Arg(
+		"syntax-only",
+		"Only check syntax. Do not check referenced files (e.g. TLS certificates).",
+	).Bool()
 
 	checkRulesCmd := checkCmd.Command("rules", "Check if the rule files are valid or not.")
 	ruleFiles := checkRulesCmd.Arg(
@@ -142,7 +146,7 @@ func main() {
 
 	switch parsedCmd {
 	case checkConfigCmd.FullCommand():
-		os.Exit(CheckConfig(*configFiles...))
+		os.Exit(CheckConfig(*syntaxOnly, *configFiles...))
 
 	case checkRulesCmd.FullCommand():
 		os.Exit(CheckRules(*ruleFiles...))
@@ -189,7 +193,7 @@ func main() {
 }
 
 // CheckConfig validates configuration files.
-func CheckConfig(files ...string) int {
+func CheckConfig(syntaxOnly bool, files ...string) int {
 	failed := false
 
 	for _, fname := range files {
@@ -200,45 +204,49 @@ func CheckConfig(files ...string) int {
 			failed = true
 			continue
 		}
-		if err := cfg.Validate(); err != nil {
-			fmt.Fprintln(os.Stderr, "  FAILED:", err)
-			failed = true
-		}
-		// Create warnings for file discovery configs that don't match files.
-		for _, scfg := range cfg.ScrapeConfigs {
-			for _, c := range scfg.ServiceDiscoveryConfigs {
-				v, ok := c.(*file.SDConfig)
-				if !ok {
-					continue
-				}
-				for _, glob := range v.Files {
-					files, err := filepath.Glob(glob)
-					if err != nil {
-						fmt.Fprintln(os.Stderr, "  FAILED:", err)
-						failed = true
+		if !syntaxOnly {
+			if err := cfg.Validate(); err != nil {
+				fmt.Fprintln(os.Stderr, "  FAILED:", err)
+				failed = true
+			}
+			// Create warnings for file discovery configs that don't match files.
+			for _, scfg := range cfg.ScrapeConfigs {
+				for _, c := range scfg.ServiceDiscoveryConfigs {
+					v, ok := c.(*file.SDConfig)
+					if !ok {
 						continue
 					}
-					if len(files) != 0 {
-						// There was at least one match for the glob.
-						continue
+					for _, glob := range v.Files {
+						files, err := filepath.Glob(glob)
+						if err != nil {
+							fmt.Fprintln(os.Stderr, "  FAILED:", err)
+							failed = true
+							continue
+						}
+						if len(files) != 0 {
+							// There was at least one match for the glob.
+							continue
+						}
+						fmt.Printf("  WARNING: file %q for file_sd in scrape job %q does not exist\n", glob, scfg.JobName)
 					}
-					fmt.Printf("  WARNING: file %q for file_sd in scrape job %q does not exist\n", glob, scfg.JobName)
 				}
 			}
 		}
 		// Check rule files.
 		for _, glob := range cfg.RuleFiles {
 			files, err := filepath.Glob(glob)
-			if err != nil {
-				fmt.Fprintln(os.Stderr, "  FAILED:", err)
-				failed = true
-				continue
-			}
-			// If an explicit file was given, error if it is not accessible.
-			if len(files) == 0 && !strings.Contains(glob, "*") {
-				fmt.Fprintf(os.Stderr, "  FAILED: %q does not point to an existing file\n", glob)
-				failed = true
-				continue
+			if !syntaxOnly {
+				if err != nil {
+					fmt.Fprintln(os.Stderr, "  FAILED:", err)
+					failed = true
+					continue
+				}
+				// If an explicit file was given, error if it is not accessible.
+				if len(files) == 0 && !strings.Contains(glob, "*") {
+					fmt.Fprintf(os.Stderr, "  FAILED: %q does not point to an existing file\n", glob)
+					failed = true
+					continue
+				}
 			}
 			for _, file := range files {
 				_, errs := checkRules(file)
