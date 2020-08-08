@@ -34,7 +34,6 @@ import (
 	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/client_golang/prometheus/testutil/promlint"
-	config_util "github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/common/version"
 	"gopkg.in/alecthomas/kingpin.v2"
@@ -262,14 +261,14 @@ func checkConfig(filename string) ([]string, error) {
 		if err := checkFileExists(scfg.HTTPClientConfig.BearerTokenFile); err != nil {
 			return nil, errors.Wrapf(err, "error checking bearer token file %q", scfg.HTTPClientConfig.BearerTokenFile)
 		}
-
-		if err := checkTLSConfig(scfg.HTTPClientConfig.TLSConfig); err != nil {
+		if err := config.ValidateTLSConfig(&scfg.HTTPClientConfig.TLSConfig); err != nil {
 			return nil, err
 		}
+
 		for _, c := range scfg.ServiceDiscoveryConfigs {
 			switch c := c.(type) {
 			case *kubernetes.SDConfig:
-				if err := checkTLSConfig(c.HTTPClientConfig.TLSConfig); err != nil {
+				if err := config.ValidateTLSConfig(&c.HTTPClientConfig.TLSConfig); err != nil {
 					return nil, err
 				}
 			case *file.SDConfig:
@@ -290,24 +289,6 @@ func checkConfig(filename string) ([]string, error) {
 	}
 
 	return ruleFiles, nil
-}
-
-func checkTLSConfig(tlsConfig config_util.TLSConfig) error {
-	if err := checkFileExists(tlsConfig.CertFile); err != nil {
-		return errors.Wrapf(err, "error checking client cert file %q", tlsConfig.CertFile)
-	}
-	if err := checkFileExists(tlsConfig.KeyFile); err != nil {
-		return errors.Wrapf(err, "error checking client key file %q", tlsConfig.KeyFile)
-	}
-
-	if len(tlsConfig.CertFile) > 0 && len(tlsConfig.KeyFile) == 0 {
-		return errors.Errorf("client cert file %q specified without client key file", tlsConfig.CertFile)
-	}
-	if len(tlsConfig.KeyFile) > 0 && len(tlsConfig.CertFile) == 0 {
-		return errors.Errorf("client key file %q specified without client cert file", tlsConfig.KeyFile)
-	}
-
-	return nil
 }
 
 // CheckRules validates rule files.
