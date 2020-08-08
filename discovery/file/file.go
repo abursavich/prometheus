@@ -74,12 +74,35 @@ func (c *SDConfig) SetOptions(opts discovery.ConfigOptions) {
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
 func (c *SDConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	*c = DefaultSDConfig
 	type plain SDConfig
+	*c = DefaultSDConfig
 	err := unmarshal((*plain)(c))
 	if err != nil {
 		return err
 	}
+	return c.validate()
+}
+
+// Validate returns an error if it can determine that the Config will fail when used.
+func (c *SDConfig) Validate() error {
+	if err := c.validate(); err != nil {
+		return err
+	}
+	for _, glob := range c.Files {
+		files, err := filepath.Glob(glob)
+		if err != nil {
+			return errors.Wrapf(err, "failed to glob path: %s", glob)
+		}
+		for _, file := range files {
+			if _, _, err := readFile(file); err != nil {
+				return errors.Wrapf(err, "failed to read file: %s", file)
+			}
+		}
+	}
+	return nil
+}
+
+func (c *SDConfig) validate() error {
 	if len(c.Files) == 0 {
 		return errors.New("file service discovery config must contain at least one path name")
 	}
@@ -337,7 +360,7 @@ func (d *Discovery) refresh(ctx context.Context, ch chan<- []*targetgroup.Group)
 	}()
 	ref := map[string]int{}
 	for _, p := range d.listFiles() {
-		tgroups, err := d.readFile(p)
+		tgroups, modTime, err := readFile(p)
 		if err != nil {
 			fileSDReadErrorsCount.Inc()
 
@@ -346,6 +369,7 @@ func (d *Discovery) refresh(ctx context.Context, ch chan<- []*targetgroup.Group)
 			ref[p] = d.lastRefresh[p]
 			continue
 		}
+		d.writeTimestamp(p, float64(modTime.Unix()))
 		select {
 		case ch <- tgroups:
 		case <-ctx.Done():
@@ -375,22 +399,22 @@ func (d *Discovery) refresh(ctx context.Context, ch chan<- []*targetgroup.Group)
 }
 
 // readFile reads a JSON or YAML list of targets groups from the file, depending on its
-// file extension. It returns full configuration target groups.
-func (d *Discovery) readFile(filename string) ([]*targetgroup.Group, error) {
+// file extension. It returns full configuration target groups and file modified time.
+func readFile(filename string) ([]*targetgroup.Group, time.Time, error) {
 	fd, err := os.Open(filename)
 	if err != nil {
-		return nil, err
+		return nil, time.Time{}, err
 	}
 	defer fd.Close()
 
 	content, err := ioutil.ReadAll(fd)
 	if err != nil {
-		return nil, err
+		return nil, time.Time{}, err
 	}
 
 	info, err := fd.Stat()
 	if err != nil {
-		return nil, err
+		return nil, time.Time{}, err
 	}
 
 	var targetGroups []*targetgroup.Group
@@ -398,11 +422,11 @@ func (d *Discovery) readFile(filename string) ([]*targetgroup.Group, error) {
 	switch ext := filepath.Ext(filename); strings.ToLower(ext) {
 	case ".json":
 		if err := json.Unmarshal(content, &targetGroups); err != nil {
-			return nil, err
+			return nil, time.Time{}, err
 		}
 	case ".yml", ".yaml":
 		if err := yaml.UnmarshalStrict(content, &targetGroups); err != nil {
-			return nil, err
+			return nil, time.Time{}, err
 		}
 	default:
 		panic(errors.Errorf("discovery.File.readFile: unhandled file extension %q", ext))
@@ -410,8 +434,7 @@ func (d *Discovery) readFile(filename string) ([]*targetgroup.Group, error) {
 
 	for i, tg := range targetGroups {
 		if tg == nil {
-			err = errors.New("nil target group item found")
-			return nil, err
+			return nil, time.Time{}, errors.New("nil target group item found")
 		}
 
 		tg.Source = fileSource(filename, i)
@@ -421,9 +444,7 @@ func (d *Discovery) readFile(filename string) ([]*targetgroup.Group, error) {
 		tg.Labels[fileSDFilepathLabel] = model.LabelValue(filename)
 	}
 
-	d.writeTimestamp(filename, float64(info.ModTime().Unix()))
-
-	return targetGroups, nil
+	return targetGroups, info.ModTime(), nil
 }
 
 // fileSource returns a source ID for the i-th target group in the file.

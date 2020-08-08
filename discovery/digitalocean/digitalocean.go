@@ -81,6 +81,11 @@ func (c *SDConfig) SetOptions(opts discovery.ConfigOptions) {
 	config.SetHTTPClientConfigDirectory(&c.HTTPClientConfig, opts.Directory)
 }
 
+// Validate returns an error if it can determine that the Config will fail when used.
+func (c *SDConfig) Validate() error {
+	return config.ValidateHTTPClientConfig(&c.HTTPClientConfig)
+}
+
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
 func (c *SDConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	*c = DefaultSDConfig

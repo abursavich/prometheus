@@ -92,6 +92,11 @@ func (c *SDConfig) SetOptions(opts discovery.ConfigOptions) {
 	c.AuthTokenFile = config.JoinDir(opts.Directory, c.AuthTokenFile)
 }
 
+// Validate returns an error if it can determine that the Config will fail when used.
+func (c *SDConfig) Validate() error {
+	return config.ValidateHTTPClientConfig(&c.HTTPClientConfig)
+}
+
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
 func (c *SDConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	*c = DefaultSDConfig

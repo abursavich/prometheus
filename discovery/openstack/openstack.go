@@ -79,6 +79,11 @@ func (c *SDConfig) SetOptions(opts discovery.ConfigOptions) {
 	config.SetTLSConfigDirectory(&c.TLSConfig, opts.Directory)
 }
 
+// Validate returns an error if it can determine that the Config will fail when used.
+func (c *SDConfig) Validate() error {
+	return config.ValidateTLSConfig(&c.TLSConfig)
+}
+
 // Role is the role of the target in OpenStack.
 type Role string
 

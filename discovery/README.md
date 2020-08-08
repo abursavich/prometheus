@@ -251,12 +251,20 @@ It's used to tag the provided `Logger` and as the part of the YAML key for your 
 mechanism's list of configs in `scrape_config` and `alertmanager_config`
 (e.g. `${NAME}_sd_configs`).
 
+If your Config implements `config.Validater` then it will be used by `promtool` to
+help discover configuration errors. It should make a reasonable attempt to locally
+vet the config, but should not make external requests (e.g. to confirm that given
+credentials are accepted).
+
 ### New Service Discovery Check List
 
 Here are some non-obvious parts of adding service discoveries that need to be verified:
 
 - Validate that discovery configs can be DeepEqualled by adding them to
   `config/testdata/conf.good.yml` and to the associated tests.
+
+- If there is a TLSConfig or HTTPClientConfig, make sure they are checked
+  in the Config's optional `Validate() error` method.
 
 - Import your SD package from `prometheus/discovery/install`. The install package is
   imported from `main` to register all builtin SD mechanisms.
