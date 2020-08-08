@@ -281,9 +281,16 @@ func main() {
 	}
 
 	// Throw error for invalid config before starting other components.
-	if _, err := config.LoadFile(cfg.configFile); err != nil {
-		level.Error(logger).Log("msg", fmt.Sprintf("Error loading config (--config.file=%s)", cfg.configFile), "err", err)
-		os.Exit(2)
+	{
+		c, err := config.LoadFile(cfg.configFile)
+		if err != nil {
+			level.Error(logger).Log("msg", fmt.Sprintf("Error loading config (--config.file=%s)", cfg.configFile), "err", err)
+			os.Exit(2)
+		}
+		if err := c.Validate(); err == nil {
+			level.Error(logger).Log("msg", fmt.Sprintf("Error validating config (--config.file=%s)", cfg.configFile), "err", err)
+			os.Exit(2)
+		}
 	}
 
 	cfg.web.ReadTimeout = time.Duration(cfg.webTimeout)
@@ -861,6 +868,9 @@ func reloadConfig(filename string, logger log.Logger, noStepSuqueryInterval *saf
 	conf, err := config.LoadFile(filename)
 	if err != nil {
 		return errors.Wrapf(err, "couldn't load configuration (--config.file=%q)", filename)
+	}
+	if err := conf.Validate(); err != nil {
+		return errors.Wrapf(err, "couldn't validate configuration (--config.file=%q)", filename)
 	}
 
 	failed := false
