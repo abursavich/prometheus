@@ -18,6 +18,7 @@ package config
 
 import (
 	"fmt"
+	"path/filepath"
 	"reflect"
 )
 
@@ -38,7 +39,95 @@ func (s *Secret) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return unmarshal((*plain)(s))
 }
 
+// JoinDir joins dir and path if path is relative.
+// If path is empty or absolute, it is returned unchanged.
+func JoinDir(dir, path string) string {
+	if path == "" || filepath.IsAbs(path) {
+		return path
+	}
+	return filepath.Join(dir, path)
+}
+
+// DirectorySetter is a config type that contains file paths that may
+// be relative to the file containing the config.
+type DirectorySetter interface {
+	// SetDirectory joins any relative file paths with dir.
+	// Any paths that are empry or absolute remain unchanged.
+	SetDirectory(dir string)
+}
+
 type seenMap map[interface{}]reflect.Value
+
+// SetDirectory uses reflection to recursively descend into v,
+// calling SetDirectory on any values implementing DirectorySetter.
+func SetDirectory(v interface{}, dir string) {
+	setDirectory(reflect.ValueOf(v), dir, seenMap{}, seenMap{})
+}
+
+func setDirectory(val reflect.Value, dir string, done, seen seenMap) {
+	if isNil(val) || ifaceSetDirectory(val, dir, done) {
+		return
+	}
+	switch typ := val.Type(); typ.Kind() {
+	case reflect.Struct:
+		for i, n := 0, typ.NumField(); i < n; i++ {
+			if typ.Field(i).PkgPath != "" {
+				continue // Field is unexported.
+			}
+			setDirectory(val.Field(i), dir, done, seen)
+		}
+	case reflect.Map:
+		for _, key := range val.MapKeys() {
+			setDirectory(key, dir, done, seen)
+			setDirectory(val.MapIndex(key), dir, done, seen)
+		}
+	case reflect.Slice, reflect.Array:
+		for i, n := 0, val.Len(); i < n; i++ {
+			setDirectory(val.Index(i), dir, done, seen)
+		}
+	case reflect.Ptr:
+		if _, cyclic := seen[val.Interface()]; !cyclic {
+			seen[val.Interface()] = val
+			setDirectory(val.Elem(), dir, done, seen)
+		}
+	case reflect.Interface:
+		setDirectory(val.Elem(), dir, done, seen)
+	}
+}
+
+func ifaceSetDirectory(val reflect.Value, dir string, done seenMap) bool {
+	if val.Kind() != reflect.Ptr && val.CanAddr() {
+		val = val.Addr()
+	}
+	if v, ok := val.Interface().(DirectorySetter); ok {
+		var key interface{}
+		switch e := chasePtr(val); e.Kind() {
+		case reflect.Slice:
+			key = reflect.SliceHeader{
+				Data: e.Pointer(),
+				Len:  e.Len(),
+				Cap:  e.Cap(),
+			}
+		case reflect.Map:
+			key = e.Pointer()
+		default:
+			key = val.Interface()
+		}
+		if _, set := done[key]; !set {
+			v.SetDirectory(dir)
+			done[key] = val
+		}
+		return true
+	}
+	return false
+}
+
+func chasePtr(val reflect.Value) reflect.Value {
+	for val.Kind() == reflect.Ptr {
+		val = val.Elem()
+	}
+	return val
+}
 
 // Clone returns a deep clone of v.
 // Any unexported fields will be unset.
