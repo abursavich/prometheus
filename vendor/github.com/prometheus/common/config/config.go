@@ -16,6 +16,11 @@
 
 package config
 
+import (
+	"fmt"
+	"reflect"
+)
+
 // Secret special type for storing secrets.
 type Secret string
 
@@ -31,4 +36,103 @@ func (s Secret) MarshalYAML() (interface{}, error) {
 func (s *Secret) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	type plain Secret
 	return unmarshal((*plain)(s))
+}
+
+type seenMap map[interface{}]reflect.Value
+
+// Clone returns a deep clone of v.
+// Any unexported fields will be unset.
+func Clone(v interface{}) interface{} {
+	src := reflect.ValueOf(v)
+	dst := reflect.New(src.Type()).Elem()
+	reflectCopy(dst, src, seenMap{})
+	return dst.Interface()
+}
+
+func reflectCopy(dst, src reflect.Value, seen seenMap) {
+	typ := src.Type()
+	if typ != dst.Type() {
+		panic(fmt.Sprintf("config: internal error: type mismatch: %v != %v", typ, dst.Type()))
+	}
+	if isNil(src) {
+		return
+	}
+	if val, ok := ifaceClone(src); ok {
+		dst.Set(val)
+		return
+	}
+	switch src.Kind() {
+	case reflect.Struct:
+		// dst.Set(src) // TODO: Share unexported values?
+		for i, n := 0, typ.NumField(); i < n; i++ {
+			if typ.Field(i).PkgPath != "" {
+				continue // Field is unexported.
+			}
+			reflectCopy(dst.Field(i), src.Field(i), seen)
+		}
+	case reflect.Map:
+		dst.Set(reflect.MakeMap(typ))
+		for _, key := range src.MapKeys() {
+			keyVal := reflect.New(typ.Key()).Elem()
+			reflectCopy(keyVal, key, seen)
+			val := reflect.New(typ.Elem()).Elem()
+			reflectCopy(val, src.MapIndex(key), seen)
+			dst.SetMapIndex(keyVal, val)
+		}
+	case reflect.Slice:
+		dst.Set(reflect.MakeSlice(typ, src.Len(), src.Len()))
+		for i, n := 0, src.Len(); i < n; i++ {
+			reflectCopy(dst.Index(i), src.Index(i), seen)
+		}
+	case reflect.Array:
+		for i, n := 0, src.Len(); i < n; i++ {
+			reflectCopy(dst.Index(i), src.Index(i), seen)
+		}
+	case reflect.Ptr:
+		if val, cyclic := seen[src.Interface()]; cyclic {
+			dst.Set(val)
+			return
+		}
+		ptr := reflect.New(typ.Elem())
+		seen[src.Interface()] = ptr
+		dst.Set(ptr)
+		reflectCopy(ptr.Elem(), src.Elem(), seen)
+	case reflect.Interface:
+		val := reflect.New(src.Elem().Type()).Elem()
+		reflectCopy(val, src.Elem(), seen)
+		dst.Set(val)
+	default:
+		dst.Set(src)
+	}
+}
+
+func ifaceClone(src reflect.Value) (reflect.Value, bool) {
+	method := src.MethodByName("Clone")
+	if !method.IsValid() {
+		if src.CanAddr() && src.Kind() != reflect.Ptr {
+			if v, ok := ifaceClone(src.Addr()); ok {
+				return v.Elem(), true
+			}
+		}
+		return reflect.Value{}, false
+	}
+	if typ := method.Type(); typ.NumIn() != 0 || typ.NumOut() != 1 || typ.Out(0) != src.Type() {
+		return reflect.Value{}, false
+	}
+	return method.Call(nil)[0], true
+}
+
+func isNil(val reflect.Value) bool {
+	switch val.Kind() {
+	case reflect.Ptr,
+		reflect.Map,
+		reflect.Slice,
+		reflect.Interface,
+		reflect.Chan,
+		reflect.Func,
+		reflect.UnsafePointer:
+		return val.IsNil()
+	default:
+		return false
+	}
 }
