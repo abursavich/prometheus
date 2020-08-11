@@ -862,6 +862,7 @@ func reloadConfig(filename string, logger log.Logger, noStepSuqueryInterval *saf
 	if err != nil {
 		return errors.Wrapf(err, "couldn't load configuration (--config.file=%q)", filename)
 	}
+	conf.SetDirectory(filepath.Dir(filename))
 
 	failed := false
 	for _, rl := range rls {

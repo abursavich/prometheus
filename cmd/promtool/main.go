@@ -239,6 +239,7 @@ func checkConfig(filename string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	cfg.SetDirectory(filepath.Dir(filename))
 
 	var ruleFiles []string
 	for _, rf := range cfg.RuleFiles {

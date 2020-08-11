@@ -676,6 +676,15 @@ var expectedConf = &Config{
 	},
 }
 
+func testLoadFile(filename string) (*Config, error) {
+	c, err := LoadFile(filename)
+	if err != nil {
+		return c, err
+	}
+	c.SetDirectory(filepath.Dir(filename))
+	return c, nil
+}
+
 func assertConfigsEqual(t *testing.T, want, got interface{}) {
 	cmpOpts := []cmp.Option{
 		cmp.Comparer(func(x, y relabel.Regexp) bool {
@@ -710,7 +719,7 @@ func assertConfigsEqual(t *testing.T, want, got interface{}) {
 }
 
 func TestYAMLRoundtrip(t *testing.T) {
-	want, err := LoadFile("testdata/conf.good.yml")
+	want, err := testLoadFile("testdata/conf.good.yml")
 	testutil.Ok(t, err)
 
 	out, err := yaml.Marshal(want)
@@ -725,16 +734,16 @@ func TestYAMLRoundtrip(t *testing.T) {
 func TestLoadConfig(t *testing.T) {
 	// Parse a valid file that sets a global scrape timeout. This tests whether parsing
 	// an overwritten default field in the global config permanently changes the default.
-	_, err := LoadFile("testdata/global_timeout.good.yml")
+	_, err := testLoadFile("testdata/global_timeout.good.yml")
 	testutil.Ok(t, err)
 
-	c, err := LoadFile("testdata/conf.good.yml")
+	c, err := testLoadFile("testdata/conf.good.yml")
 	testutil.Ok(t, err)
 	testutil.Equals(t, expectedConf, c)
 }
 
 func TestScrapeIntervalLarger(t *testing.T) {
-	c, err := LoadFile("testdata/scrape_interval_larger.good.yml")
+	c, err := testLoadFile("testdata/scrape_interval_larger.good.yml")
 	testutil.Ok(t, err)
 	testutil.Equals(t, 1, len(c.ScrapeConfigs))
 	for _, sc := range c.ScrapeConfigs {
@@ -744,7 +753,7 @@ func TestScrapeIntervalLarger(t *testing.T) {
 
 // YAML marshaling must not reveal authentication credentials.
 func TestElideSecrets(t *testing.T) {
-	c, err := LoadFile("testdata/conf.good.yml")
+	c, err := testLoadFile("testdata/conf.good.yml")
 	testutil.Ok(t, err)
 
 	secretRe := regexp.MustCompile(`\\u003csecret\\u003e|<secret>`)
@@ -761,26 +770,26 @@ func TestElideSecrets(t *testing.T) {
 
 func TestLoadConfigRuleFilesAbsolutePath(t *testing.T) {
 	// Parse a valid file that sets a rule files with an absolute path
-	c, err := LoadFile(ruleFilesConfigFile)
+	c, err := testLoadFile(ruleFilesConfigFile)
 	testutil.Ok(t, err)
 	testutil.Equals(t, ruleFilesExpectedConf, c)
 }
 
 func TestKubernetesEmptyAPIServer(t *testing.T) {
-	_, err := LoadFile("testdata/kubernetes_empty_apiserver.good.yml")
+	_, err := testLoadFile("testdata/kubernetes_empty_apiserver.good.yml")
 	testutil.Ok(t, err)
 }
 
 func TestKubernetesSelectors(t *testing.T) {
-	_, err := LoadFile("testdata/kubernetes_selectors_endpoints.good.yml")
+	_, err := testLoadFile("testdata/kubernetes_selectors_endpoints.good.yml")
 	testutil.Ok(t, err)
-	_, err = LoadFile("testdata/kubernetes_selectors_node.good.yml")
+	_, err = testLoadFile("testdata/kubernetes_selectors_node.good.yml")
 	testutil.Ok(t, err)
-	_, err = LoadFile("testdata/kubernetes_selectors_ingress.good.yml")
+	_, err = testLoadFile("testdata/kubernetes_selectors_ingress.good.yml")
 	testutil.Ok(t, err)
-	_, err = LoadFile("testdata/kubernetes_selectors_pod.good.yml")
+	_, err = testLoadFile("testdata/kubernetes_selectors_pod.good.yml")
 	testutil.Ok(t, err)
-	_, err = LoadFile("testdata/kubernetes_selectors_service.good.yml")
+	_, err = testLoadFile("testdata/kubernetes_selectors_service.good.yml")
 	testutil.Ok(t, err)
 }
 
@@ -1004,7 +1013,7 @@ var expectedErrors = []struct {
 
 func TestBadConfigs(t *testing.T) {
 	for _, ee := range expectedErrors {
-		_, err := LoadFile("testdata/" + ee.filename)
+		_, err := testLoadFile("testdata/" + ee.filename)
 		testutil.NotOk(t, err, "%s", ee.filename)
 		testutil.Assert(t, strings.Contains(err.Error(), ee.errMsg),
 			"Expected error for %s to contain %q but got: %s", ee.filename, ee.errMsg, err)

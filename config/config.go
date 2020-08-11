@@ -17,7 +17,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/url"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -61,7 +60,6 @@ func LoadFile(filename string) (*Config, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "parsing YAML file %s", filename)
 	}
-	cfg.SetDirectory(filepath.Dir(filename))
 	return cfg, nil
 }
 
