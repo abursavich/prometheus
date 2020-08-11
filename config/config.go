@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/url"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -60,6 +61,7 @@ func LoadFile(filename string) (*Config, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "parsing YAML file %s", filename)
 	}
+	cfg.SetDirectory(filepath.Dir(filename))
 	return cfg, nil
 }
 
@@ -144,8 +146,20 @@ func (c *Config) Clone() *Config {
 
 // SetDirectory joins any relative file paths with dir.
 func (c *Config) SetDirectory(dir string) {
-	type plain Config
-	config.SetDirectory((*plain)(c), dir)
+	c.GlobalConfig.SetDirectory(dir)
+	c.AlertingConfig.SetDirectory(dir)
+	for i, glob := range c.RuleFiles {
+		c.RuleFiles[i] = config.JoinDir(dir, glob)
+	}
+	for _, cfg := range c.ScrapeConfigs {
+		cfg.SetDirectory(dir)
+	}
+	for _, cfg := range c.RemoteWriteConfigs {
+		cfg.SetDirectory(dir)
+	}
+	for _, cfg := range c.RemoteReadConfigs {
+		cfg.SetDirectory(dir)
+	}
 }
 
 func (c Config) String() string {
@@ -245,6 +259,11 @@ type GlobalConfig struct {
 	ExternalLabels labels.Labels `yaml:"external_labels,omitempty"`
 }
 
+// SetDirectory joins any relative file paths with dir.
+func (c *GlobalConfig) SetDirectory(dir string) {
+	c.QueryLogFile = config.JoinDir(dir, c.QueryLogFile)
+}
+
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
 func (c *GlobalConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	// Create a clean global config as the previous one was already populated
@@ -333,8 +352,12 @@ type ScrapeConfig struct {
 
 // SetDirectory joins any relative file paths with dir.
 func (c *ScrapeConfig) SetDirectory(dir string) {
-	type plain ScrapeConfig
-	config.SetDirectory((*plain)(c), dir)
+	for _, cfg := range c.ServiceDiscoveryConfigs {
+		if v, ok := cfg.(config.DirectorySetter); ok {
+			v.SetDirectory(dir)
+		}
+	}
+	c.HTTPClientConfig.SetDirectory(dir)
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
@@ -388,8 +411,9 @@ type AlertingConfig struct {
 
 // SetDirectory joins any relative file paths with dir.
 func (c *AlertingConfig) SetDirectory(dir string) {
-	type plain AlertingConfig
-	config.SetDirectory((*plain)(c), dir)
+	for _, cfg := range c.AlertmanagerConfigs {
+		cfg.SetDirectory(dir)
+	}
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
@@ -480,8 +504,12 @@ type AlertmanagerConfig struct {
 
 // SetDirectory joins any relative file paths with dir.
 func (c *AlertmanagerConfig) SetDirectory(dir string) {
-	type plain AlertmanagerConfig
-	config.SetDirectory((*plain)(c), dir)
+	for _, cfg := range c.ServiceDiscoveryConfigs {
+		if v, ok := cfg.(config.DirectorySetter); ok {
+			v.SetDirectory(dir)
+		}
+	}
+	c.HTTPClientConfig.SetDirectory(dir)
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
@@ -560,8 +588,7 @@ type RemoteWriteConfig struct {
 
 // SetDirectory joins any relative file paths with dir.
 func (c *RemoteWriteConfig) SetDirectory(dir string) {
-	type plain RemoteWriteConfig
-	config.SetDirectory((*plain)(c), dir)
+	c.HTTPClientConfig.SetDirectory(dir)
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
@@ -628,8 +655,7 @@ type RemoteReadConfig struct {
 
 // SetDirectory joins any relative file paths with dir.
 func (c *RemoteReadConfig) SetDirectory(dir string) {
-	type plain RemoteReadConfig
-	config.SetDirectory((*plain)(c), dir)
+	c.HTTPClientConfig.SetDirectory(dir)
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
