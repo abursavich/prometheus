@@ -439,14 +439,18 @@ func main() {
 
 	reloaders := []reloader{
 		{
-			name:     "remote_storage",
-			reloader: remoteStorage.ApplyConfig,
+			name: "remote_storage",
+			reloader: func(orig, cfg *config.Config) error {
+				return remoteStorage.ApplyConfig(cfg)
+			},
 		}, {
-			name:     "web_handler",
-			reloader: webHandler.ApplyConfig,
+			name: "web_handler",
+			reloader: func(orig, cfg *config.Config) error {
+				return webHandler.ApplyConfig(orig)
+			},
 		}, {
 			name: "query_engine",
-			reloader: func(cfg *config.Config) error {
+			reloader: func(orig, cfg *config.Config) error {
 				if cfg.GlobalConfig.QueryLogFile == "" {
 					queryEngine.SetQueryLogger(nil)
 					return nil
@@ -462,11 +466,13 @@ func main() {
 		}, {
 			// The Scrape and notifier managers need to reload before the Discovery manager as
 			// they need to read the most updated config when receiving the new targets list.
-			name:     "scrape",
-			reloader: scrapeManager.ApplyConfig,
+			name: "scrape",
+			reloader: func(orig, cfg *config.Config) error {
+				return scrapeManager.ApplyConfig(cfg)
+			},
 		}, {
 			name: "scrape_sd",
-			reloader: func(cfg *config.Config) error {
+			reloader: func(orig, cfg *config.Config) error {
 				c := make(map[string]discovery.Configs)
 				for _, v := range cfg.ScrapeConfigs {
 					c[v.JobName] = v.ServiceDiscoveryConfigs
@@ -474,11 +480,13 @@ func main() {
 				return discoveryManagerScrape.ApplyConfig(c)
 			},
 		}, {
-			name:     "notify",
-			reloader: notifierManager.ApplyConfig,
+			name: "notify",
+			reloader: func(orig, cfg *config.Config) error {
+				return notifierManager.ApplyConfig(cfg)
+			},
 		}, {
 			name: "notify_sd",
-			reloader: func(cfg *config.Config) error {
+			reloader: func(orig, cfg *config.Config) error {
 				c := make(map[string]discovery.Configs)
 				for k, v := range cfg.AlertingConfig.AlertmanagerConfigs.ToMap() {
 					c[k] = v.ServiceDiscoveryConfigs
@@ -487,7 +495,7 @@ func main() {
 			},
 		}, {
 			name: "rules",
-			reloader: func(cfg *config.Config) error {
+			reloader: func(orig, cfg *config.Config) error {
 				// Get all rule files matching the configuration paths.
 				var files []string
 				for _, pat := range cfg.RuleFiles {
@@ -841,7 +849,7 @@ func (i *safePromQLNoStepSubqueryInterval) Get(int64) int64 {
 
 type reloader struct {
 	name     string
-	reloader func(*config.Config) error
+	reloader func(orig, conf *config.Config) error
 }
 
 func reloadConfig(filename string, logger log.Logger, noStepSuqueryInterval *safePromQLNoStepSubqueryInterval, rls ...reloader) (err error) {
@@ -858,16 +866,17 @@ func reloadConfig(filename string, logger log.Logger, noStepSuqueryInterval *saf
 		}
 	}()
 
-	conf, err := config.LoadFile(filename)
+	orig, err := config.LoadFile(filename)
 	if err != nil {
 		return errors.Wrapf(err, "couldn't load configuration (--config.file=%q)", filename)
 	}
+	conf := orig.Clone()
 	conf.SetDirectory(filepath.Dir(filename))
 
 	failed := false
 	for _, rl := range rls {
 		rstart := time.Now()
-		if err := rl.reloader(conf); err != nil {
+		if err := rl.reloader(orig, conf); err != nil {
 			level.Error(logger).Log("msg", "Failed to apply configuration", "err", err)
 			failed = true
 		}

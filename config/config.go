@@ -136,6 +136,12 @@ type Config struct {
 	RemoteReadConfigs  []*RemoteReadConfig  `yaml:"remote_read,omitempty"`
 }
 
+// Clone returns a deep copy of the config.
+func (c *Config) Clone() *Config {
+	type plain Config
+	return (*Config)(config.Clone((*plain)(c)).(*plain))
+}
+
 // SetDirectory joins any relative file paths with dir.
 func (c *Config) SetDirectory(dir string) {
 	type plain Config
