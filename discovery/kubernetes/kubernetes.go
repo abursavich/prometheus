@@ -39,7 +39,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	"github.com/prometheus/common/version"
-	"github.com/prometheus/prometheus/config"
 	"github.com/prometheus/prometheus/discovery"
 	"github.com/prometheus/prometheus/discovery/targetgroup"
 )
@@ -127,7 +126,12 @@ func (c *SDConfig) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Di
 
 // SetOptions applies the options to the Config.
 func (c *SDConfig) SetOptions(opts discovery.ConfigOptions) {
-	config.SetHTTPClientConfigDirectory(&c.HTTPClientConfig, opts.Directory)
+	c.HTTPClientConfig.SetDirectory(opts.Directory)
+}
+
+// SetDirectory joins any relative file paths with dir.
+func (c *SDConfig) SetDirectory(dir string) {
+	c.HTTPClientConfig.SetDirectory(dir)
 }
 
 type roleSelector struct {

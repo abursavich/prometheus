@@ -30,7 +30,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/pkg/errors"
-	config_util "github.com/prometheus/common/config"
+	"github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
 
 	"github.com/prometheus/prometheus/discovery"
@@ -71,14 +71,14 @@ func init() {
 
 // SDConfig is the configuration for Azure based service discovery.
 type SDConfig struct {
-	Environment          string             `yaml:"environment,omitempty"`
-	Port                 int                `yaml:"port"`
-	SubscriptionID       string             `yaml:"subscription_id"`
-	TenantID             string             `yaml:"tenant_id,omitempty"`
-	ClientID             string             `yaml:"client_id,omitempty"`
-	ClientSecret         config_util.Secret `yaml:"client_secret,omitempty"`
-	RefreshInterval      model.Duration     `yaml:"refresh_interval,omitempty"`
-	AuthenticationMethod string             `yaml:"authentication_method,omitempty"`
+	Environment          string         `yaml:"environment,omitempty"`
+	Port                 int            `yaml:"port"`
+	SubscriptionID       string         `yaml:"subscription_id"`
+	TenantID             string         `yaml:"tenant_id,omitempty"`
+	ClientID             string         `yaml:"client_id,omitempty"`
+	ClientSecret         config.Secret  `yaml:"client_secret,omitempty"`
+	RefreshInterval      model.Duration `yaml:"refresh_interval,omitempty"`
+	AuthenticationMethod string         `yaml:"authentication_method,omitempty"`
 }
 
 // Name returns the name of the Config.

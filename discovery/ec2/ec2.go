@@ -28,7 +28,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/go-kit/kit/log"
 	"github.com/pkg/errors"
-	config_util "github.com/prometheus/common/config"
+	"github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
 
 	"github.com/prometheus/prometheus/discovery"
@@ -77,15 +77,15 @@ type Filter struct {
 
 // SDConfig is the configuration for EC2 based service discovery.
 type SDConfig struct {
-	Endpoint        string             `yaml:"endpoint"`
-	Region          string             `yaml:"region"`
-	AccessKey       string             `yaml:"access_key,omitempty"`
-	SecretKey       config_util.Secret `yaml:"secret_key,omitempty"`
-	Profile         string             `yaml:"profile,omitempty"`
-	RoleARN         string             `yaml:"role_arn,omitempty"`
-	RefreshInterval model.Duration     `yaml:"refresh_interval,omitempty"`
-	Port            int                `yaml:"port"`
-	Filters         []*Filter          `yaml:"filters"`
+	Endpoint        string         `yaml:"endpoint"`
+	Region          string         `yaml:"region"`
+	AccessKey       string         `yaml:"access_key,omitempty"`
+	SecretKey       config.Secret  `yaml:"secret_key,omitempty"`
+	Profile         string         `yaml:"profile,omitempty"`
+	RoleARN         string         `yaml:"role_arn,omitempty"`
+	RefreshInterval model.Duration `yaml:"refresh_interval,omitempty"`
+	Port            int            `yaml:"port"`
+	Filters         []*Filter      `yaml:"filters"`
 }
 
 // Name returns the name of the Config.

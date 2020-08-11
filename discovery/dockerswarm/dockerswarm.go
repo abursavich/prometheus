@@ -22,11 +22,10 @@ import (
 
 	"github.com/docker/docker/client"
 	"github.com/go-kit/kit/log"
-	config_util "github.com/prometheus/common/config"
+	"github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/common/version"
 
-	"github.com/prometheus/prometheus/config"
 	"github.com/prometheus/prometheus/discovery"
 	"github.com/prometheus/prometheus/discovery/refresh"
 	"github.com/prometheus/prometheus/discovery/targetgroup"
@@ -50,7 +49,7 @@ func init() {
 
 // SDConfig is the configuration for Docker Swarm based service discovery.
 type SDConfig struct {
-	HTTPClientConfig config_util.HTTPClientConfig `yaml:",inline"`
+	HTTPClientConfig config.HTTPClientConfig `yaml:",inline"`
 
 	Host string `yaml:"host"`
 	Role string `yaml:"role"`
@@ -69,7 +68,12 @@ func (c *SDConfig) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Di
 
 // SetOptions applies the options to the Config.
 func (c *SDConfig) SetOptions(opts discovery.ConfigOptions) {
-	config.SetHTTPClientConfigDirectory(&c.HTTPClientConfig, opts.Directory)
+	c.HTTPClientConfig.SetDirectory(opts.Directory)
+}
+
+// SetDirectory joins any relative file paths with dir.
+func (c *SDConfig) SetDirectory(dir string) {
+	c.HTTPClientConfig.SetDirectory(dir)
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
@@ -128,7 +132,7 @@ func NewDiscovery(conf *SDConfig, logger log.Logger) (*Discovery, error) {
 	// unix, which are not supported by the HTTP client. Passing HTTP client
 	// options to the Docker client makes those non-HTTP requests fail.
 	if hostURL.Scheme == "http" || hostURL.Scheme == "https" {
-		rt, err := config_util.NewRoundTripperFromConfig(conf.HTTPClientConfig, "dockerswarm_sd", false)
+		rt, err := config.NewRoundTripperFromConfig(conf.HTTPClientConfig, "dockerswarm_sd", false)
 		if err != nil {
 			return nil, err
 		}

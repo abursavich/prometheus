@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	config_util "github.com/prometheus/common/config"
+	"github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
 	yaml "gopkg.in/yaml.v2"
 
@@ -61,7 +61,7 @@ func LoadFile(filename string) (*Config, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "parsing YAML file %s", filename)
 	}
-	resolveFilepaths(filepath.Dir(filename), cfg)
+	cfg.SetDirectory(filepath.Dir(filename))
 	return cfg, nil
 }
 
@@ -138,33 +138,10 @@ type Config struct {
 	RemoteReadConfigs  []*RemoteReadConfig  `yaml:"remote_read,omitempty"`
 }
 
-// resolveFilepaths joins all relative paths in a configuration
-// with a given base directory.
-func resolveFilepaths(dir string, cfg *Config) {
-	for i, rf := range cfg.RuleFiles {
-		cfg.RuleFiles[i] = JoinDir(dir, rf)
-	}
-	cfgOpts := discovery.ConfigOptions{
-		Directory: dir,
-	}
-	for _, c := range cfg.ScrapeConfigs {
-		SetHTTPClientConfigDirectory(&c.HTTPClientConfig, dir)
-		for _, c := range c.ServiceDiscoveryConfigs {
-			c.SetOptions(cfgOpts)
-		}
-	}
-	for _, c := range cfg.AlertingConfig.AlertmanagerConfigs {
-		SetHTTPClientConfigDirectory(&c.HTTPClientConfig, dir)
-		for _, c := range c.ServiceDiscoveryConfigs {
-			c.SetOptions(cfgOpts)
-		}
-	}
-	for _, c := range cfg.RemoteReadConfigs {
-		SetHTTPClientConfigDirectory(&c.HTTPClientConfig, dir)
-	}
-	for _, c := range cfg.RemoteWriteConfigs {
-		SetHTTPClientConfigDirectory(&c.HTTPClientConfig, dir)
-	}
+// SetDirectory joins any relative file paths with dir.
+func (c *Config) SetDirectory(dir string) {
+	type plain Config
+	config.SetDirectory((*plain)(c), dir)
 }
 
 func (c Config) String() string {
@@ -341,13 +318,19 @@ type ScrapeConfig struct {
 	// We cannot do proper Go type embedding below as the parser will then parse
 	// values arbitrarily into the overflow maps of further-down types.
 
-	ServiceDiscoveryConfigs discovery.Configs            `yaml:"-"`
-	HTTPClientConfig        config_util.HTTPClientConfig `yaml:",inline"`
+	ServiceDiscoveryConfigs discovery.Configs       `yaml:"-"`
+	HTTPClientConfig        config.HTTPClientConfig `yaml:",inline"`
 
 	// List of target relabel configurations.
 	RelabelConfigs []*relabel.Config `yaml:"relabel_configs,omitempty"`
 	// List of metric relabel configurations.
 	MetricRelabelConfigs []*relabel.Config `yaml:"metric_relabel_configs,omitempty"`
+}
+
+// SetDirectory joins any relative file paths with dir.
+func (c *ScrapeConfig) SetDirectory(dir string) {
+	type plain ScrapeConfig
+	config.SetDirectory((*plain)(c), dir)
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
@@ -397,6 +380,12 @@ func (c *ScrapeConfig) MarshalYAML() (interface{}, error) {
 type AlertingConfig struct {
 	AlertRelabelConfigs []*relabel.Config   `yaml:"alert_relabel_configs,omitempty"`
 	AlertmanagerConfigs AlertmanagerConfigs `yaml:"alertmanagers,omitempty"`
+}
+
+// SetDirectory joins any relative file paths with dir.
+func (c *AlertingConfig) SetDirectory(dir string) {
+	type plain AlertingConfig
+	config.SetDirectory((*plain)(c), dir)
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
@@ -468,8 +457,8 @@ type AlertmanagerConfig struct {
 	// We cannot do proper Go type embedding below as the parser will then parse
 	// values arbitrarily into the overflow maps of further-down types.
 
-	ServiceDiscoveryConfigs discovery.Configs            `yaml:"-"`
-	HTTPClientConfig        config_util.HTTPClientConfig `yaml:",inline"`
+	ServiceDiscoveryConfigs discovery.Configs       `yaml:"-"`
+	HTTPClientConfig        config.HTTPClientConfig `yaml:",inline"`
 
 	// The URL scheme to use when talking to Alertmanagers.
 	Scheme string `yaml:"scheme,omitempty"`
@@ -483,6 +472,12 @@ type AlertmanagerConfig struct {
 
 	// List of Alertmanager relabel configurations.
 	RelabelConfigs []*relabel.Config `yaml:"relabel_configs,omitempty"`
+}
+
+// SetDirectory joins any relative file paths with dir.
+func (c *AlertmanagerConfig) SetDirectory(dir string) {
+	type plain AlertmanagerConfig
+	config.SetDirectory((*plain)(c), dir)
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
@@ -548,15 +543,21 @@ func CheckTargetAddress(address model.LabelValue) error {
 
 // RemoteWriteConfig is the configuration for writing to remote storage.
 type RemoteWriteConfig struct {
-	URL                 *config_util.URL  `yaml:"url"`
+	URL                 *config.URL       `yaml:"url"`
 	RemoteTimeout       model.Duration    `yaml:"remote_timeout,omitempty"`
 	WriteRelabelConfigs []*relabel.Config `yaml:"write_relabel_configs,omitempty"`
 	Name                string            `yaml:"name,omitempty"`
 
 	// We cannot do proper Go type embedding below as the parser will then parse
 	// values arbitrarily into the overflow maps of further-down types.
-	HTTPClientConfig config_util.HTTPClientConfig `yaml:",inline"`
-	QueueConfig      QueueConfig                  `yaml:"queue_config,omitempty"`
+	HTTPClientConfig config.HTTPClientConfig `yaml:",inline"`
+	QueueConfig      QueueConfig             `yaml:"queue_config,omitempty"`
+}
+
+// SetDirectory joins any relative file paths with dir.
+func (c *RemoteWriteConfig) SetDirectory(dir string) {
+	type plain RemoteWriteConfig
+	config.SetDirectory((*plain)(c), dir)
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
@@ -607,18 +608,24 @@ type QueueConfig struct {
 
 // RemoteReadConfig is the configuration for reading from remote storage.
 type RemoteReadConfig struct {
-	URL           *config_util.URL `yaml:"url"`
-	RemoteTimeout model.Duration   `yaml:"remote_timeout,omitempty"`
-	ReadRecent    bool             `yaml:"read_recent,omitempty"`
-	Name          string           `yaml:"name,omitempty"`
+	URL           *config.URL    `yaml:"url"`
+	RemoteTimeout model.Duration `yaml:"remote_timeout,omitempty"`
+	ReadRecent    bool           `yaml:"read_recent,omitempty"`
+	Name          string         `yaml:"name,omitempty"`
 
 	// We cannot do proper Go type embedding below as the parser will then parse
 	// values arbitrarily into the overflow maps of further-down types.
-	HTTPClientConfig config_util.HTTPClientConfig `yaml:",inline"`
+	HTTPClientConfig config.HTTPClientConfig `yaml:",inline"`
 
 	// RequiredMatchers is an optional list of equality matchers which have to
 	// be present in a selector to query the remote read endpoint.
 	RequiredMatchers model.LabelSet `yaml:"required_matchers,omitempty"`
+}
+
+// SetDirectory joins any relative file paths with dir.
+func (c *RemoteReadConfig) SetDirectory(dir string) {
+	type plain RemoteReadConfig
+	config.SetDirectory((*plain)(c), dir)
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
