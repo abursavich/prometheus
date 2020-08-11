@@ -230,15 +230,6 @@ type Config interface {
 	// NewDiscoverer returns a Discoverer for the Config
 	// with the given DiscovererOptions.
 	NewDiscoverer(DiscovererOptions) (Discoverer, error)
-
-	// SetOptions applies the ConfigOptions to the Config.
-	SetOptions(ConfigOptions)
-}
-
-type ConfigOptions struct {
-	// Directory may be used to resolve relative file paths
-	// in the config (e.g. TLS certificates).
-	Directory string
 }
 
 type DiscovererOptions struct {

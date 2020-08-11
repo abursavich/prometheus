@@ -72,13 +72,6 @@ func (c *SDConfig) SetDirectory(dir string) {
 	}
 }
 
-// SetOptions applies the options to the Config.
-func (c *SDConfig) SetOptions(opts discovery.ConfigOptions) {
-	for i, file := range c.Files {
-		c.Files[i] = config.JoinDir(opts.Directory, file)
-	}
-}
-
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
 func (c *SDConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	*c = DefaultSDConfig

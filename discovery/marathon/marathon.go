@@ -85,12 +85,6 @@ func (c *SDConfig) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Di
 	return NewDiscovery(*c, opts.Logger)
 }
 
-// SetOptions applies the options to the Config.
-func (c *SDConfig) SetOptions(opts discovery.ConfigOptions) {
-	c.HTTPClientConfig.SetDirectory(opts.Directory)
-	c.AuthTokenFile = config.JoinDir(opts.Directory, c.AuthTokenFile)
-}
-
 // SetDirectory joins any relative file paths with dir.
 func (c *SDConfig) SetDirectory(dir string) {
 	c.HTTPClientConfig.SetDirectory(dir)

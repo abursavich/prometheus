@@ -89,9 +89,6 @@ func (c *SDConfig) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Di
 	return NewDiscovery(c, opts.Logger), nil
 }
 
-// SetOptions applies the options to the Config.
-func (c *SDConfig) SetOptions(opts discovery.ConfigOptions) {}
-
 func validateAuthParam(param, name string) error {
 	if len(param) == 0 {
 		return errors.Errorf("azure SD configuration requires a %s", name)

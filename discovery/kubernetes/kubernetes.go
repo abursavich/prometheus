@@ -25,7 +25,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
-	config_util "github.com/prometheus/common/config"
+	"github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
 	apiv1 "k8s.io/api/core/v1"
 	disv1beta1 "k8s.io/api/discovery/v1beta1"
@@ -109,11 +109,11 @@ func (c *Role) UnmarshalYAML(unmarshal func(interface{}) error) error {
 
 // SDConfig is the configuration for Kubernetes service discovery.
 type SDConfig struct {
-	APIServer          config_util.URL              `yaml:"api_server,omitempty"`
-	Role               Role                         `yaml:"role"`
-	HTTPClientConfig   config_util.HTTPClientConfig `yaml:",inline"`
-	NamespaceDiscovery NamespaceDiscovery           `yaml:"namespaces,omitempty"`
-	Selectors          []SelectorConfig             `yaml:"selectors,omitempty"`
+	APIServer          config.URL              `yaml:"api_server,omitempty"`
+	Role               Role                    `yaml:"role"`
+	HTTPClientConfig   config.HTTPClientConfig `yaml:",inline"`
+	NamespaceDiscovery NamespaceDiscovery      `yaml:"namespaces,omitempty"`
+	Selectors          []SelectorConfig        `yaml:"selectors,omitempty"`
 }
 
 // Name returns the name of the Config.
@@ -122,11 +122,6 @@ func (*SDConfig) Name() string { return "kubernetes" }
 // NewDiscoverer returns a Discoverer for the Config.
 func (c *SDConfig) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
 	return New(opts.Logger, c)
-}
-
-// SetOptions applies the options to the Config.
-func (c *SDConfig) SetOptions(opts discovery.ConfigOptions) {
-	c.HTTPClientConfig.SetDirectory(opts.Directory)
 }
 
 // SetDirectory joins any relative file paths with dir.
@@ -169,7 +164,7 @@ func (c *SDConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	if err != nil {
 		return err
 	}
-	if c.APIServer.URL == nil && !reflect.DeepEqual(c.HTTPClientConfig, config_util.HTTPClientConfig{}) {
+	if c.APIServer.URL == nil && !reflect.DeepEqual(c.HTTPClientConfig, config.HTTPClientConfig{}) {
 		return errors.Errorf("to use custom HTTP client configuration please provide the 'api_server' URL explicitly")
 	}
 
@@ -267,7 +262,7 @@ func New(l log.Logger, conf *SDConfig) (*Discovery, error) {
 		}
 		level.Info(l).Log("msg", "Using pod service account via in-cluster config")
 	} else {
-		rt, err := config_util.NewRoundTripperFromConfig(conf.HTTPClientConfig, "kubernetes_sd", false)
+		rt, err := config.NewRoundTripperFromConfig(conf.HTTPClientConfig, "kubernetes_sd", false)
 		if err != nil {
 			return nil, err
 		}

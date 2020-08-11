@@ -905,7 +905,6 @@ type errorConfig struct{ err error }
 
 func (e errorConfig) Name() string                                        { return "error" }
 func (e errorConfig) NewDiscoverer(DiscovererOptions) (Discoverer, error) { return nil, e.err }
-func (e errorConfig) SetOptions(ConfigOptions)                            {}
 
 func TestGaugeFailedConfigs(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
