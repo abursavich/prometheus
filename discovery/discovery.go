@@ -42,13 +42,6 @@ type DiscovererOptions struct {
 	Logger log.Logger
 }
 
-// ConfigOptions provides options for a Config.
-type ConfigOptions struct {
-	// Directory may be used to resolve relative file paths
-	// in the config (e.g. TLS certificates).
-	Directory string
-}
-
 // A Config provides the configuration and constructor for a Discoverer.
 type Config interface {
 	// Name returns the name of the discovery mechanism.
@@ -57,9 +50,6 @@ type Config interface {
 	// NewDiscoverer returns a Discoverer for the Config
 	// with the given DiscovererOptions.
 	NewDiscoverer(DiscovererOptions) (Discoverer, error)
-
-	// SetOptions applies the ConfigOptions to the Config.
-	SetOptions(ConfigOptions)
 }
 
 // Configs is a slice of Config values that uses custom YAML marshaling and unmarshaling
@@ -104,9 +94,6 @@ func (StaticConfig) Name() string { return "static" }
 func (c StaticConfig) NewDiscoverer(DiscovererOptions) (Discoverer, error) {
 	return staticDiscoverer(c), nil
 }
-
-// SetOptions applies the options to the Config.
-func (StaticConfig) SetOptions(options ConfigOptions) {}
 
 type staticDiscoverer []*targetgroup.Group
 

@@ -64,9 +64,6 @@ func (c *ServersetSDConfig) NewDiscoverer(opts discovery.DiscovererOptions) (dis
 	return NewServersetDiscovery(c, opts.Logger)
 }
 
-// SetOptions applies the options to the Config.
-func (c *ServersetSDConfig) SetOptions(opts discovery.ConfigOptions) {}
-
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
 func (c *ServersetSDConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	*c = DefaultServersetSDConfig
@@ -103,9 +100,6 @@ func (*NerveSDConfig) Name() string { return "nerve" }
 func (c *NerveSDConfig) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
 	return NewNerveDiscovery(c, opts.Logger)
 }
-
-// SetOptions applies the options to the Config.
-func (c *NerveSDConfig) SetOptions(opts discovery.ConfigOptions) {}
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
 func (c *NerveSDConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {

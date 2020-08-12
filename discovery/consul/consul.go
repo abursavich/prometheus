@@ -28,10 +28,9 @@ import (
 	conntrack "github.com/mwitkow/go-conntrack"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
-	config_util "github.com/prometheus/common/config"
+	"github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
 
-	"github.com/prometheus/prometheus/config"
 	"github.com/prometheus/prometheus/discovery"
 	"github.com/prometheus/prometheus/discovery/targetgroup"
 	"github.com/prometheus/prometheus/util/strutil"
@@ -109,13 +108,13 @@ func init() {
 
 // SDConfig is the configuration for Consul service discovery.
 type SDConfig struct {
-	Server       string             `yaml:"server,omitempty"`
-	Token        config_util.Secret `yaml:"token,omitempty"`
-	Datacenter   string             `yaml:"datacenter,omitempty"`
-	TagSeparator string             `yaml:"tag_separator,omitempty"`
-	Scheme       string             `yaml:"scheme,omitempty"`
-	Username     string             `yaml:"username,omitempty"`
-	Password     config_util.Secret `yaml:"password,omitempty"`
+	Server       string        `yaml:"server,omitempty"`
+	Token        config.Secret `yaml:"token,omitempty"`
+	Datacenter   string        `yaml:"datacenter,omitempty"`
+	TagSeparator string        `yaml:"tag_separator,omitempty"`
+	Scheme       string        `yaml:"scheme,omitempty"`
+	Username     string        `yaml:"username,omitempty"`
+	Password     config.Secret `yaml:"password,omitempty"`
 
 	// See https://www.consul.io/docs/internals/consensus.html#consistency-modes,
 	// stale reads are a lot cheaper and are a necessity if you have >5k targets.
@@ -135,7 +134,7 @@ type SDConfig struct {
 	// Desired node metadata.
 	NodeMeta map[string]string `yaml:"node_meta,omitempty"`
 
-	TLSConfig config_util.TLSConfig `yaml:"tls_config,omitempty"`
+	TLSConfig config.TLSConfig `yaml:"tls_config,omitempty"`
 }
 
 // Name returns the name of the Config.
@@ -146,9 +145,9 @@ func (c *SDConfig) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Di
 	return NewDiscovery(c, opts.Logger)
 }
 
-// SetOptions applies the options to the Config.
-func (c *SDConfig) SetOptions(opts discovery.ConfigOptions) {
-	config.SetTLSConfigDirectory(&c.TLSConfig, opts.Directory)
+// SetDirectory joins any relative file paths with dir.
+func (c *SDConfig) SetDirectory(dir string) {
+	c.TLSConfig.SetDirectory(dir)
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
@@ -186,7 +185,7 @@ func NewDiscovery(conf *SDConfig, logger log.Logger) (*Discovery, error) {
 		logger = log.NewNopLogger()
 	}
 
-	tls, err := config_util.NewTLSConfig(&conf.TLSConfig)
+	tls, err := config.NewTLSConfig(&conf.TLSConfig)
 	if err != nil {
 		return nil, err
 	}

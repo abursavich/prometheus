@@ -230,15 +230,6 @@ type Config interface {
 	// NewDiscoverer returns a Discoverer for the Config
 	// with the given DiscovererOptions.
 	NewDiscoverer(DiscovererOptions) (Discoverer, error)
-
-	// SetOptions applies the ConfigOptions to the Config.
-	SetOptions(ConfigOptions)
-}
-
-type ConfigOptions struct {
-	// Directory may be used to resolve relative file paths
-	// in the config (e.g. TLS certificates).
-	Directory string
 }
 
 type DiscovererOptions struct {
@@ -257,6 +248,9 @@ Here are some non-obvious parts of adding service discoveries that need to be ve
 
 - Validate that discovery configs can be DeepEqualled by adding them to
   `config/testdata/conf.good.yml` and to the associated tests.
+
+- If the config contains file paths directly or indirectly (e.g. with a TLSConfig or
+  HTTPClientConfig field), then it must implement `config.DirectorySetter`.
 
 - Import your SD package from `prometheus/discovery/install`. The install package is
   imported from `main` to register all builtin SD mechanisms.

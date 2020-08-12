@@ -29,11 +29,11 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
 	fsnotify "gopkg.in/fsnotify/fsnotify.v1"
 	yaml "gopkg.in/yaml.v2"
 
-	"github.com/prometheus/prometheus/config"
 	"github.com/prometheus/prometheus/discovery"
 	"github.com/prometheus/prometheus/discovery/targetgroup"
 )
@@ -65,10 +65,10 @@ func (c *SDConfig) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Di
 	return NewDiscovery(c, opts.Logger), nil
 }
 
-// SetOptions applies the options to the Config.
-func (c *SDConfig) SetOptions(opts discovery.ConfigOptions) {
+// SetDirectory joins any relative file paths with dir.
+func (c *SDConfig) SetDirectory(dir string) {
 	for i, file := range c.Files {
-		c.Files[i] = config.JoinDir(opts.Directory, file)
+		c.Files[i] = config.JoinDir(dir, file)
 	}
 }
 

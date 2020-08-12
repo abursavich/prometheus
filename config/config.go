@@ -347,9 +347,9 @@ type ScrapeConfig struct {
 // SetDirectory joins any relative file paths with dir.
 func (c *ScrapeConfig) SetDirectory(dir string) {
 	for _, cfg := range c.ServiceDiscoveryConfigs {
-		cfg.SetOptions(discovery.ConfigOptions{
-			Directory: dir,
-		})
+		if v, ok := cfg.(config.DirectorySetter); ok {
+			v.SetDirectory(dir)
+		}
 	}
 	c.HTTPClientConfig.SetDirectory(dir)
 }
@@ -499,9 +499,9 @@ type AlertmanagerConfig struct {
 // SetDirectory joins any relative file paths with dir.
 func (c *AlertmanagerConfig) SetDirectory(dir string) {
 	for _, cfg := range c.ServiceDiscoveryConfigs {
-		cfg.SetOptions(discovery.ConfigOptions{
-			Directory: dir,
-		})
+		if v, ok := cfg.(config.DirectorySetter); ok {
+			v.SetDirectory(dir)
+		}
 	}
 	c.HTTPClientConfig.SetDirectory(dir)
 }
