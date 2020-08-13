@@ -26,6 +26,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/prometheus/common/config"
+	"github.com/prometheus/common/config/configtest"
 	"github.com/prometheus/common/model"
 	"gopkg.in/yaml.v2"
 
@@ -653,6 +654,7 @@ var expectedConf = &Config{
 			},
 		},
 	},
+
 	AlertingConfig: AlertingConfig{
 		AlertmanagerConfigs: []*AlertmanagerConfig{
 			{
@@ -660,15 +662,35 @@ var expectedConf = &Config{
 				Timeout:    model.Duration(10 * time.Second),
 				APIVersion: AlertmanagerAPIVersionV1,
 				ServiceDiscoveryConfigs: discovery.Configs{
-					discovery.StaticConfig{
-						{
-							Targets: []model.LabelSet{
-								{model.AddressLabel: "1.2.3.4:9093"},
-								{model.AddressLabel: "1.2.3.5:9093"},
-								{model.AddressLabel: "1.2.3.6:9093"},
+					&kubernetes.SDConfig{
+						Role:      "endpoints",
+						APIServer: *mustParseURL("https://localhost:1234"),
+						HTTPClientConfig: config.HTTPClientConfig{
+							TLSConfig: config.TLSConfig{
+								CAFile: "testdata/valid_ca_file",
 							},
-							Source: "0",
+							BearerTokenFile: "testdata/valid_bearer_token",
 						},
+					},
+				},
+				RelabelConfigs: []*relabel.Config{
+					{
+						SourceLabels: model.LabelNames{
+							"__meta_kubernetes_namespace",
+							"__meta_kubernetes_service_name",
+							"__meta_kubernetes_endpoint_port_name",
+						},
+						Regex:       relabel.MustNewRegexp("monitoring;alertmanager;https"),
+						Action:      "keep",
+						Separator:   ";",
+						Replacement: "$1",
+					},
+				},
+				HTTPClientConfig: config.HTTPClientConfig{
+					TLSConfig: config.TLSConfig{
+						CAFile:   "testdata/valid_ca_file",
+						CertFile: "testdata/valid_cert_file",
+						KeyFile:  "testdata/valid_key_file",
 					},
 				},
 			},
@@ -1047,4 +1069,20 @@ func TestEmptyGlobalBlock(t *testing.T) {
 func kubernetesSDHostURL() config.URL {
 	tURL, _ := url.Parse("https://localhost:1234")
 	return config.URL{URL: tURL}
+}
+
+func TestSetDirectory(t *testing.T) {
+	loadFile := func(file string) (config.DirectorySetter, error) {
+		return LoadFile(file)
+	}
+	assertEqual := func(t testing.TB, want, got interface{}) {
+		assertConfigsEqual(t, want, got)
+	}
+
+	files, err := filepath.Glob("testdata/*.good.yml")
+	testutil.Ok(t, err)
+	testutil.Assert(t, len(files) > 0, "no good configs found")
+	for _, file := range files {
+		configtest.TestSetDirectory(t, file, loadFile, assertEqual)
+	}
 }

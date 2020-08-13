@@ -281,9 +281,21 @@ scrape_configs:
 
 alerting:
   alertmanagers:
-  - scheme: https
-    static_configs:
-    - targets:
-      - "1.2.3.4:9093"
-      - "1.2.3.5:9093"
-      - "1.2.3.6:9093"
+  - kubernetes_sd_configs:
+    - role: endpoints
+      api_server: 'https://localhost:1234'
+      bearer_token_file: valid_bearer_token
+      tls_config:
+        ca_file: valid_ca_file
+    scheme: https
+    tls_config:
+      ca_file: valid_ca_file
+      cert_file: valid_cert_file
+      key_file:  valid_key_file
+    relabel_configs:
+    - source_labels:
+      - __meta_kubernetes_namespace
+      - __meta_kubernetes_service_name
+      - __meta_kubernetes_endpoint_port_name
+      action: keep
+      regex: monitoring;alertmanager;https
