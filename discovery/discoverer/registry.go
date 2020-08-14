@@ -39,8 +39,8 @@ var (
 	configTypesMu sync.Mutex
 	configTypes   = make(map[reflect.Type]reflect.Type)
 
-	emptyStructType            = reflect.TypeOf(struct{}{})
-	serviceDiscoveryConfigType = reflect.TypeOf(ServiceDiscoveryConfig{})
+	emptyStructType = reflect.TypeOf(struct{}{})
+	configsType     = reflect.TypeOf([]Config{})
 )
 
 // RegisterConfig registers the given Config type for YAML marshaling and unmarshaling.
@@ -86,9 +86,9 @@ func getConfigType(out reflect.Type) reflect.Type {
 	}
 	// initial exported fields map one-to-one
 	var fields []reflect.StructField
-	for i := 0; i < out.NumField(); i++ {
+	for i, n := 0, out.NumField(); i < n; i++ {
 		switch field := out.Field(i); {
-		case field.PkgPath == "": // TODO(abursavich): && field.Type != configsType:
+		case field.PkgPath == "" && field.Type != configsType:
 			fields = append(fields, field)
 		default:
 			fields = append(fields, reflect.StructField{
@@ -127,11 +127,12 @@ func UnmarshalYAMLWithInlineConfigs(out interface{}, unmarshal func(interface{})
 	// copy shared fields (defaults) to dynamic value
 	var configs *[]Config
 	for i, n := 0, outVal.NumField(); i < n; i++ {
+		if outTyp.Field(i).Type == configsType {
+			configs = outVal.Field(i).Addr().Interface().(*[]Config)
+			continue
+		}
 		if cfgTyp.Field(i).PkgPath != "" {
 			continue // field is unexported: ignore
-		}
-		if outTyp.Field(i).Type == serviceDiscoveryConfigType { // TODO(abursavich): change to configsType
-			configs = &outVal.Field(i).Addr().Interface().(*ServiceDiscoveryConfig).Configs
 		}
 		cfgVal.Field(i).Set(outVal.Field(i))
 	}
@@ -163,7 +164,7 @@ func readConfigs(structVal reflect.Value, startField int) ([]Config, error) {
 		configs []Config
 		targets []*targetgroup.Group
 	)
-	for i := startField; i < structVal.NumField(); i++ {
+	for i, n := startField, structVal.NumField(); i < n; i++ {
 		field := structVal.Field(i)
 		if field.Kind() != reflect.Slice {
 			panic("discovery: internal error: field is not a slice")
@@ -202,20 +203,20 @@ func MarshalYAMLWithInlineConfigs(in interface{}) (interface{}, error) {
 	for inVal.Kind() == reflect.Ptr {
 		inVal = inVal.Elem()
 	}
-	inType := inVal.Type()
+	inTyp := inVal.Type()
 
-	cfgTyp := getConfigType(inType)
+	cfgTyp := getConfigType(inTyp)
 	cfgPtr := reflect.New(cfgTyp)
 	cfgVal := cfgPtr.Elem()
 
 	// copy shared fields to dynamic value
 	var configs *[]Config
-	for i, n := 0, inVal.NumField(); i < n; i++ {
+	for i, n := 0, inTyp.NumField(); i < n; i++ {
+		if inTyp.Field(i).Type == configsType {
+			configs = inVal.Field(i).Addr().Interface().(*[]Config)
+		}
 		if cfgTyp.Field(i).PkgPath != "" {
 			continue // field is unexported: ignore
-		}
-		if cfgTyp.Field(i).Type == serviceDiscoveryConfigType { // TODO(abursavich): change to configsType
-			configs = &cfgVal.Field(i).Addr().Interface().(*ServiceDiscoveryConfig).Configs
 		}
 		cfgVal.Field(i).Set(inVal.Field(i))
 	}
