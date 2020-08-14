@@ -144,7 +144,7 @@ var expectedConf = &Config{
 				BearerTokenFile: filepath.FromSlash("testdata/valid_token_file"),
 			},
 
-			ServiceDiscoveryConfigs: []discovery.Config{
+			ServiceDiscoveryConfigs: discovery.Configs{
 				&file.SDConfig{
 					Files:           []string{"testdata/foo/*.slow.json", "testdata/foo/*.slow.yml", "testdata/single/file.yml"},
 					RefreshInterval: model.Duration(10 * time.Minute),
@@ -216,7 +216,7 @@ var expectedConf = &Config{
 			MetricsPath: "/my_path",
 			Scheme:      "https",
 
-			ServiceDiscoveryConfigs: []discovery.Config{
+			ServiceDiscoveryConfigs: discovery.Configs{
 				&dns.SDConfig{
 					Names: []string{
 						"first.dns.address.domain.com",
@@ -297,7 +297,7 @@ var expectedConf = &Config{
 			MetricsPath: DefaultScrapeConfig.MetricsPath,
 			Scheme:      DefaultScrapeConfig.Scheme,
 
-			ServiceDiscoveryConfigs: []discovery.Config{
+			ServiceDiscoveryConfigs: discovery.Configs{
 				&consul.SDConfig{
 					Server:          "localhost:1234",
 					Token:           "mysecret",
@@ -357,7 +357,7 @@ var expectedConf = &Config{
 			MetricsPath: DefaultScrapeConfig.MetricsPath,
 			Scheme:      DefaultScrapeConfig.Scheme,
 
-			ServiceDiscoveryConfigs: []discovery.Config{
+			ServiceDiscoveryConfigs: discovery.Configs{
 				&kubernetes.SDConfig{
 					APIServer: kubernetesSDHostURL(),
 					Role:      kubernetes.RoleEndpoint,
@@ -391,7 +391,7 @@ var expectedConf = &Config{
 				},
 			},
 
-			ServiceDiscoveryConfigs: []discovery.Config{
+			ServiceDiscoveryConfigs: discovery.Configs{
 				&kubernetes.SDConfig{
 					APIServer: kubernetesSDHostURL(),
 					Role:      kubernetes.RoleEndpoint,
@@ -413,7 +413,7 @@ var expectedConf = &Config{
 			MetricsPath: DefaultScrapeConfig.MetricsPath,
 			Scheme:      DefaultScrapeConfig.Scheme,
 
-			ServiceDiscoveryConfigs: []discovery.Config{
+			ServiceDiscoveryConfigs: discovery.Configs{
 				&marathon.SDConfig{
 					Servers: []string{
 						"https://marathon.example.com:443",
@@ -439,7 +439,7 @@ var expectedConf = &Config{
 			MetricsPath: DefaultScrapeConfig.MetricsPath,
 			Scheme:      DefaultScrapeConfig.Scheme,
 
-			ServiceDiscoveryConfigs: []discovery.Config{
+			ServiceDiscoveryConfigs: discovery.Configs{
 				&ec2.SDConfig{
 					Region:          "us-east-1",
 					AccessKey:       "access",
@@ -470,7 +470,7 @@ var expectedConf = &Config{
 			MetricsPath: DefaultScrapeConfig.MetricsPath,
 			Scheme:      DefaultScrapeConfig.Scheme,
 
-			ServiceDiscoveryConfigs: []discovery.Config{
+			ServiceDiscoveryConfigs: discovery.Configs{
 				&azure.SDConfig{
 					Environment:          "AzurePublicCloud",
 					SubscriptionID:       "11AAAA11-A11A-111A-A111-1111A1111A11",
@@ -493,7 +493,7 @@ var expectedConf = &Config{
 			MetricsPath: DefaultScrapeConfig.MetricsPath,
 			Scheme:      DefaultScrapeConfig.Scheme,
 
-			ServiceDiscoveryConfigs: []discovery.Config{
+			ServiceDiscoveryConfigs: discovery.Configs{
 				&zookeeper.NerveSDConfig{
 					Servers: []string{"localhost"},
 					Paths:   []string{"/monitoring"},
@@ -511,7 +511,7 @@ var expectedConf = &Config{
 			MetricsPath: DefaultScrapeConfig.MetricsPath,
 			Scheme:      DefaultScrapeConfig.Scheme,
 
-			ServiceDiscoveryConfigs: []discovery.Config{
+			ServiceDiscoveryConfigs: discovery.Configs{
 				discovery.StaticConfig{
 					{
 						Targets: []model.LabelSet{
@@ -532,7 +532,7 @@ var expectedConf = &Config{
 			MetricsPath: "/federate",
 			Scheme:      DefaultScrapeConfig.Scheme,
 
-			ServiceDiscoveryConfigs: []discovery.Config{
+			ServiceDiscoveryConfigs: discovery.Configs{
 				discovery.StaticConfig{
 					{
 						Targets: []model.LabelSet{
@@ -553,7 +553,7 @@ var expectedConf = &Config{
 			MetricsPath: DefaultScrapeConfig.MetricsPath,
 			Scheme:      DefaultScrapeConfig.Scheme,
 
-			ServiceDiscoveryConfigs: []discovery.Config{
+			ServiceDiscoveryConfigs: discovery.Configs{
 				discovery.StaticConfig{
 					{
 						Targets: []model.LabelSet{
@@ -574,7 +574,7 @@ var expectedConf = &Config{
 			MetricsPath: DefaultScrapeConfig.MetricsPath,
 			Scheme:      DefaultScrapeConfig.Scheme,
 
-			ServiceDiscoveryConfigs: []discovery.Config{
+			ServiceDiscoveryConfigs: discovery.Configs{
 				&triton.SDConfig{
 					Account:         "testAccount",
 					Role:            "container",
@@ -600,7 +600,7 @@ var expectedConf = &Config{
 			MetricsPath: DefaultScrapeConfig.MetricsPath,
 			Scheme:      DefaultScrapeConfig.Scheme,
 
-			ServiceDiscoveryConfigs: []discovery.Config{
+			ServiceDiscoveryConfigs: discovery.Configs{
 				&digitalocean.SDConfig{
 					HTTPClientConfig: config.HTTPClientConfig{
 						BearerToken: "abcdef",
@@ -620,7 +620,7 @@ var expectedConf = &Config{
 			MetricsPath: DefaultScrapeConfig.MetricsPath,
 			Scheme:      DefaultScrapeConfig.Scheme,
 
-			ServiceDiscoveryConfigs: []discovery.Config{
+			ServiceDiscoveryConfigs: discovery.Configs{
 				&dockerswarm.SDConfig{
 					Host:            "http://127.0.0.1:2375",
 					Role:            "nodes",
@@ -639,7 +639,7 @@ var expectedConf = &Config{
 			MetricsPath: DefaultScrapeConfig.MetricsPath,
 			Scheme:      DefaultScrapeConfig.Scheme,
 
-			ServiceDiscoveryConfigs: []discovery.Config{&openstack.SDConfig{
+			ServiceDiscoveryConfigs: discovery.Configs{&openstack.SDConfig{
 				Role:            "instance",
 				Region:          "RegionOne",
 				Port:            80,
@@ -659,7 +659,7 @@ var expectedConf = &Config{
 				Scheme:     "https",
 				Timeout:    model.Duration(10 * time.Second),
 				APIVersion: AlertmanagerAPIVersionV1,
-				ServiceDiscoveryConfigs: []discovery.Config{
+				ServiceDiscoveryConfigs: discovery.Configs{
 					discovery.StaticConfig{
 						{
 							Targets: []model.LabelSet{
@@ -682,7 +682,7 @@ func assertConfigsEqual(t testing.TB, want, got interface{}, opts ...cmp.Option)
 			// Regexps have unexported state.
 			return x.String() == y.String()
 		}),
-		cmp.Transformer("discovery.Config.Sorter", func(cfgs []discovery.Config) []discovery.Config {
+		cmp.Transformer("discovery.Config.Sorter", func(cfgs discovery.Configs) discovery.Configs {
 			// The service discovery configs are marshaled and unmarshaled
 			// in a particular order, sorted by their names and with
 			// static_configs always at the end.
@@ -692,7 +692,7 @@ func assertConfigsEqual(t testing.TB, want, got interface{}, opts ...cmp.Option)
 			// future test writers from going mad over inexplicably failed
 			// comparisons between unmarshaled yaml configs and hand-crafted
 			// go values (with configs in the "wrong" order).
-			clone := append(make([]discovery.Config, 0, len(cfgs)), cfgs...)
+			clone := append(make(discovery.Configs, 0, len(cfgs)), cfgs...)
 			sort.SliceStable(clone, func(i, k int) bool {
 				return clone[i].Name() < clone[k].Name()
 			})

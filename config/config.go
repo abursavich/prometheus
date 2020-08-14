@@ -341,7 +341,7 @@ type ScrapeConfig struct {
 	// We cannot do proper Go type embedding below as the parser will then parse
 	// values arbitrarily into the overflow maps of further-down types.
 
-	ServiceDiscoveryConfigs []discovery.Config           `yaml:"-"`
+	ServiceDiscoveryConfigs discovery.Configs            `yaml:"-"`
 	HTTPClientConfig        config_util.HTTPClientConfig `yaml:",inline"`
 
 	// List of target relabel configurations.
@@ -468,7 +468,7 @@ type AlertmanagerConfig struct {
 	// We cannot do proper Go type embedding below as the parser will then parse
 	// values arbitrarily into the overflow maps of further-down types.
 
-	ServiceDiscoveryConfigs []discovery.Config           `yaml:"-"`
+	ServiceDiscoveryConfigs discovery.Configs            `yaml:"-"`
 	HTTPClientConfig        config_util.HTTPClientConfig `yaml:",inline"`
 
 	// The URL scheme to use when talking to Alertmanagers.
@@ -520,7 +520,7 @@ func (c *AlertmanagerConfig) MarshalYAML() (interface{}, error) {
 	return discovery.MarshalYAMLWithInlineConfigs(c)
 }
 
-func checkStaticTargets(configs []discovery.Config) error {
+func checkStaticTargets(configs discovery.Configs) error {
 	for _, cfg := range configs {
 		sc, ok := cfg.(discovery.StaticConfig)
 		if !ok {

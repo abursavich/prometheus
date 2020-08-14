@@ -40,7 +40,7 @@ var (
 	configTypes   = make(map[reflect.Type]reflect.Type)
 
 	emptyStructType = reflect.TypeOf(struct{}{})
-	configsType     = reflect.TypeOf([]Config{})
+	configsType     = reflect.TypeOf(Configs{})
 )
 
 // RegisterConfig registers the given Config type for YAML marshaling and unmarshaling.
@@ -108,6 +108,8 @@ func getConfigType(out reflect.Type) reflect.Type {
 // UnmarshalYAMLWithInlineConfigs helps implement yaml.Unmarshal for structs
 // that have a Configs field that should be inlined.
 func UnmarshalYAMLWithInlineConfigs(out interface{}, unmarshal func(interface{}) error) error {
+	// This function can be removed if https://github.com/go-yaml/yaml/issues/642 is fixed.
+
 	outVal := reflect.ValueOf(out)
 	if outVal.Kind() != reflect.Ptr {
 		// TODO: panic?
@@ -125,10 +127,10 @@ func UnmarshalYAMLWithInlineConfigs(out interface{}, unmarshal func(interface{})
 	cfgVal := cfgPtr.Elem()
 
 	// copy shared fields (defaults) to dynamic value
-	var configs *[]Config
+	var configs *Configs
 	for i, n := 0, outVal.NumField(); i < n; i++ {
 		if outTyp.Field(i).Type == configsType {
-			configs = outVal.Field(i).Addr().Interface().(*[]Config)
+			configs = outVal.Field(i).Addr().Interface().(*Configs)
 			continue
 		}
 		if cfgTyp.Field(i).PkgPath != "" {
@@ -159,9 +161,9 @@ func UnmarshalYAMLWithInlineConfigs(out interface{}, unmarshal func(interface{})
 	return err
 }
 
-func readConfigs(structVal reflect.Value, startField int) ([]Config, error) {
+func readConfigs(structVal reflect.Value, startField int) (Configs, error) {
 	var (
-		configs []Config
+		configs Configs
 		targets []*targetgroup.Group
 	)
 	for i, n := startField, structVal.NumField(); i < n; i++ {
@@ -199,6 +201,8 @@ func readConfigs(structVal reflect.Value, startField int) ([]Config, error) {
 // MarshalYAMLWithInlineConfigs helps implement yaml.Marshal for structs
 // that have a Configs field that should be inlined.
 func MarshalYAMLWithInlineConfigs(in interface{}) (interface{}, error) {
+	// This function can be removed if https://github.com/go-yaml/yaml/issues/642 is fixed.
+
 	inVal := reflect.ValueOf(in)
 	for inVal.Kind() == reflect.Ptr {
 		inVal = inVal.Elem()
@@ -210,10 +214,10 @@ func MarshalYAMLWithInlineConfigs(in interface{}) (interface{}, error) {
 	cfgVal := cfgPtr.Elem()
 
 	// copy shared fields to dynamic value
-	var configs *[]Config
+	var configs *Configs
 	for i, n := 0, inTyp.NumField(); i < n; i++ {
 		if inTyp.Field(i).Type == configsType {
-			configs = inVal.Field(i).Addr().Interface().(*[]Config)
+			configs = inVal.Field(i).Addr().Interface().(*Configs)
 		}
 		if cfgTyp.Field(i).PkgPath != "" {
 			continue // field is unexported: ignore
@@ -232,7 +236,7 @@ func MarshalYAMLWithInlineConfigs(in interface{}) (interface{}, error) {
 	return cfgPtr.Interface(), nil
 }
 
-func writeConfigs(structVal reflect.Value, configs []Config) error {
+func writeConfigs(structVal reflect.Value, configs Configs) error {
 	targets := structVal.FieldByName(staticConfigsFieldName).Addr().Interface().(*[]*targetgroup.Group)
 	for _, c := range configs {
 		if sc, ok := c.(StaticConfig); ok {
