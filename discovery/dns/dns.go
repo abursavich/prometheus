@@ -28,7 +28,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/model"
 
-	"github.com/prometheus/prometheus/discovery/discoverer"
+	"github.com/prometheus/prometheus/discovery"
 	"github.com/prometheus/prometheus/discovery/refresh"
 	"github.com/prometheus/prometheus/discovery/targetgroup"
 )
@@ -67,7 +67,7 @@ var (
 )
 
 func init() {
-	discoverer.RegisterConfig(&SDConfig{})
+	discovery.RegisterConfig(&SDConfig{})
 	prometheus.MustRegister(dnsSDLookupFailuresCount)
 	prometheus.MustRegister(dnsSDLookupsCount)
 }
@@ -84,12 +84,12 @@ type SDConfig struct {
 func (*SDConfig) Name() string { return "dns" }
 
 // NewDiscoverer returns a Discoverer for the Config.
-func (c *SDConfig) NewDiscoverer(opts discoverer.Options) (discoverer.Discoverer, error) {
+func (c *SDConfig) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
 	return NewDiscovery(*c, opts.Logger), nil
 }
 
 // SetOptions applies the options to the Config.
-func (c *SDConfig) SetOptions(opts discoverer.ConfigOptions) {}
+func (c *SDConfig) SetOptions(opts discovery.ConfigOptions) {}
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
 func (c *SDConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {

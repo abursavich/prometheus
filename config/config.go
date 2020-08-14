@@ -27,7 +27,7 @@ import (
 	"github.com/prometheus/common/model"
 	yaml "gopkg.in/yaml.v2"
 
-	"github.com/prometheus/prometheus/discovery/discoverer"
+	"github.com/prometheus/prometheus/discovery"
 	"github.com/prometheus/prometheus/pkg/labels"
 	"github.com/prometheus/prometheus/pkg/relabel"
 )
@@ -144,7 +144,7 @@ func resolveFilepaths(dir string, cfg *Config) {
 	for i, rf := range cfg.RuleFiles {
 		cfg.RuleFiles[i] = JoinDir(dir, rf)
 	}
-	cfgOpts := discoverer.ConfigOptions{
+	cfgOpts := discovery.ConfigOptions{
 		Directory: dir,
 	}
 	for _, c := range cfg.ScrapeConfigs {
@@ -341,7 +341,7 @@ type ScrapeConfig struct {
 	// We cannot do proper Go type embedding below as the parser will then parse
 	// values arbitrarily into the overflow maps of further-down types.
 
-	ServiceDiscoveryConfigs []discoverer.Config          `yaml:"-"`
+	ServiceDiscoveryConfigs []discovery.Config           `yaml:"-"`
 	HTTPClientConfig        config_util.HTTPClientConfig `yaml:",inline"`
 
 	// List of target relabel configurations.
@@ -353,7 +353,7 @@ type ScrapeConfig struct {
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
 func (c *ScrapeConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	*c = DefaultScrapeConfig
-	if err := discoverer.UnmarshalYAMLWithInlineConfigs(c, unmarshal); err != nil {
+	if err := discovery.UnmarshalYAMLWithInlineConfigs(c, unmarshal); err != nil {
 		return err
 	}
 	if len(c.JobName) == 0 {
@@ -390,7 +390,7 @@ func (c *ScrapeConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 
 // MarshalYAML implements the yaml.Marshaler interface.
 func (c *ScrapeConfig) MarshalYAML() (interface{}, error) {
-	return discoverer.MarshalYAMLWithInlineConfigs(c)
+	return discovery.MarshalYAMLWithInlineConfigs(c)
 }
 
 // AlertingConfig configures alerting and alertmanager related configs.
@@ -468,7 +468,7 @@ type AlertmanagerConfig struct {
 	// We cannot do proper Go type embedding below as the parser will then parse
 	// values arbitrarily into the overflow maps of further-down types.
 
-	ServiceDiscoveryConfigs []discoverer.Config          `yaml:"-"`
+	ServiceDiscoveryConfigs []discovery.Config           `yaml:"-"`
 	HTTPClientConfig        config_util.HTTPClientConfig `yaml:",inline"`
 
 	// The URL scheme to use when talking to Alertmanagers.
@@ -488,7 +488,7 @@ type AlertmanagerConfig struct {
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
 func (c *AlertmanagerConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	*c = DefaultAlertmanagerConfig
-	if err := discoverer.UnmarshalYAMLWithInlineConfigs(c, unmarshal); err != nil {
+	if err := discovery.UnmarshalYAMLWithInlineConfigs(c, unmarshal); err != nil {
 		return err
 	}
 
@@ -517,12 +517,12 @@ func (c *AlertmanagerConfig) UnmarshalYAML(unmarshal func(interface{}) error) er
 
 // MarshalYAML implements the yaml.Marshaler interface.
 func (c *AlertmanagerConfig) MarshalYAML() (interface{}, error) {
-	return discoverer.MarshalYAMLWithInlineConfigs(c)
+	return discovery.MarshalYAMLWithInlineConfigs(c)
 }
 
-func checkStaticTargets(configs []discoverer.Config) error {
+func checkStaticTargets(configs []discovery.Config) error {
 	for _, cfg := range configs {
-		sc, ok := cfg.(discoverer.StaticConfig)
+		sc, ok := cfg.(discovery.StaticConfig)
 		if !ok {
 			continue
 		}
