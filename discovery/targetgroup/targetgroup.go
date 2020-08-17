@@ -45,13 +45,8 @@ func (tg *Group) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	if err := unmarshal(&g); err != nil {
 		return err
 	}
-	tg.Targets = make([]model.LabelSet, 0, len(g.Targets))
-	for _, t := range g.Targets {
-		tg.Targets = append(tg.Targets, model.LabelSet{
-			model.AddressLabel: model.LabelValue(t),
-		})
-	}
-	tg.Labels = g.Labels
+	tg.Targets = targets(g.Targets)
+	tg.Labels = labels(g.Labels)
 	return nil
 }
 
@@ -82,12 +77,27 @@ func (tg *Group) UnmarshalJSON(b []byte) error {
 	if err := dec.Decode(&g); err != nil {
 		return err
 	}
-	tg.Targets = make([]model.LabelSet, 0, len(g.Targets))
-	for _, t := range g.Targets {
-		tg.Targets = append(tg.Targets, model.LabelSet{
-			model.AddressLabel: model.LabelValue(t),
-		})
-	}
-	tg.Labels = g.Labels
+	tg.Targets = targets(g.Targets)
+	tg.Labels = labels(g.Labels)
 	return nil
+}
+
+func targets(addrs []string) []model.LabelSet {
+	if len(addrs) == 0 {
+		return nil
+	}
+	sets := make([]model.LabelSet, len(addrs))
+	for i, addr := range addrs {
+		sets[i] = model.LabelSet{
+			model.AddressLabel: model.LabelValue(addr),
+		}
+	}
+	return sets
+}
+
+func labels(lbls model.LabelSet) model.LabelSet {
+	if len(lbls) == 0 {
+		return nil
+	}
+	return lbls
 }

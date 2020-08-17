@@ -32,7 +32,7 @@ func TestTargetGroupStrictJsonUnmarshal(t *testing.T) {
 		{
 			json: `	{"labels": {},"targets": []}`,
 			expectedReply: nil,
-			expectedGroup: Group{Targets: []model.LabelSet{}, Labels: model.LabelSet{}},
+			expectedGroup: Group{},
 		},
 		{
 			json: `	{"labels": {"my":"label"},"targets": ["localhost:9090","localhost:9091"]}`,
@@ -112,7 +112,7 @@ func TestTargetGroupYamlUnmarshal(t *testing.T) {
 		{
 			// empty target group.
 			yaml:          "labels:\ntargets:\n",
-			expectedGroup: Group{Targets: []model.LabelSet{}},
+			expectedGroup: Group{},
 			expectedReply: nil,
 		},
 		{
