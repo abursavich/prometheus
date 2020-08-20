@@ -25,12 +25,14 @@ func TestMain(m *testing.M) {
 	goleak.VerifyTestMain(m)
 }
 
-func TestNewDiscoveryError(t *testing.T) {
-	_, err := NewDiscovery(
-		[]string{"unreachable.test"},
-		time.Second, []string{"/"},
+func TestNewDiscovererError(t *testing.T) {
+	_, err := newDiscoverer(
 		nil,
-		func(data []byte, path string) (model.LabelSet, error) { return nil, nil })
+		time.Second,
+		[]string{"unreachable.test"},
+		[]string{"/"},
+		func(data []byte, path string) (model.LabelSet, error) { return nil, nil },
+	)
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}
