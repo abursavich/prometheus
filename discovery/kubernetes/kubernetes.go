@@ -109,11 +109,11 @@ func (c *Role) UnmarshalYAML(unmarshal func(interface{}) error) error {
 
 // SDConfig is the configuration for Kubernetes service discovery.
 type SDConfig struct {
-	APIServer          config.URL              `yaml:"api_server,omitempty"`
-	Role               Role                    `yaml:"role"`
-	HTTPClientConfig   config.HTTPClientConfig `yaml:",inline"`
-	NamespaceDiscovery NamespaceDiscovery      `yaml:"namespaces,omitempty"`
-	Selectors          []SelectorConfig        `yaml:"selectors,omitempty"`
+	APIServer        config.URL              `yaml:"api_server,omitempty"`
+	Role             Role                    `yaml:"role"`
+	HTTPClientConfig config.HTTPClientConfig `yaml:",inline"`
+	Namespaces       Namespaces              `yaml:"namespaces,omitempty"`
+	Selectors        []SelectorConfig        `yaml:"selectors,omitempty"`
 }
 
 // Name returns the name of the Config.
@@ -121,7 +121,7 @@ func (*SDConfig) Name() string { return "kubernetes" }
 
 // NewDiscoverer returns a Discoverer for the Config.
 func (c *SDConfig) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
-	return New(opts.Logger, c)
+	return newDiscoverer(opts.Logger, c)
 }
 
 // SetDirectory joins any relative file paths with dir.
@@ -211,41 +211,34 @@ func (c *SDConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return nil
 }
 
-// NamespaceDiscovery is the configuration for discovering
+// Namespaces is the configuration for discovering
 // Kubernetes namespaces.
-type NamespaceDiscovery struct {
+type Namespaces struct {
 	Names []string `yaml:"names"`
 }
 
-// UnmarshalYAML implements the yaml.Unmarshaler interface.
-func (c *NamespaceDiscovery) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	*c = NamespaceDiscovery{}
-	type plain NamespaceDiscovery
-	return unmarshal((*plain)(c))
-}
-
-// Discovery implements the discoverer interface for discovering
+// discoverer implements the discoverer interface for discovering
 // targets from Kubernetes.
-type Discovery struct {
+type discoverer struct {
 	sync.RWMutex
-	client             kubernetes.Interface
-	role               Role
-	logger             log.Logger
-	namespaceDiscovery *NamespaceDiscovery
-	discoverers        []discovery.Discoverer
-	selectors          roleSelector
+	client      kubernetes.Interface
+	role        Role
+	logger      log.Logger
+	namespaces  []string
+	discoverers []discovery.Discoverer
+	selectors   roleSelector
 }
 
-func (d *Discovery) getNamespaces() []string {
-	namespaces := d.namespaceDiscovery.Names
+func (d *discoverer) getNamespaces() []string {
+	namespaces := d.namespaces
 	if len(namespaces) == 0 {
 		namespaces = []string{apiv1.NamespaceAll}
 	}
 	return namespaces
 }
 
-// New creates a new Kubernetes discovery for the given role.
-func New(l log.Logger, conf *SDConfig) (*Discovery, error) {
+// newDiscoverer creates a new Kubernetes discovery for the given role.
+func newDiscoverer(l log.Logger, conf *SDConfig) (*discoverer, error) {
 	if l == nil {
 		l = log.NewNopLogger()
 	}
@@ -278,13 +271,13 @@ func New(l log.Logger, conf *SDConfig) (*Discovery, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Discovery{
-		client:             c,
-		logger:             l,
-		role:               conf.Role,
-		namespaceDiscovery: &conf.NamespaceDiscovery,
-		discoverers:        make([]discovery.Discoverer, 0),
-		selectors:          mapSelector(conf.Selectors),
+	return &discoverer{
+		client:      c,
+		logger:      l,
+		role:        conf.Role,
+		namespaces:  conf.Namespaces.Names,
+		discoverers: make([]discovery.Discoverer, 0),
+		selectors:   mapSelector(conf.Selectors),
 	}, nil
 }
 
@@ -318,7 +311,7 @@ func mapSelector(rawSelector []SelectorConfig) roleSelector {
 const resyncPeriod = 10 * time.Minute
 
 // Run implements the discoverer interface.
-func (d *Discovery) Run(ctx context.Context, ch chan<- []*targetgroup.Group) {
+func (d *discoverer) Run(ctx context.Context, ch chan<- []*targetgroup.Group) {
 	d.Lock()
 	namespaces := d.getNamespaces()
 
@@ -364,7 +357,7 @@ func (d *Discovery) Run(ctx context.Context, ch chan<- []*targetgroup.Group) {
 					return p.Watch(ctx, options)
 				},
 			}
-			eps := NewEndpointSlice(
+			eps := newEndpointSliceDiscoverer(
 				log.With(d.logger, "role", "endpointslice"),
 				cache.NewSharedInformer(slw, &apiv1.Service{}, resyncPeriod),
 				cache.NewSharedInformer(elw, &disv1beta1.EndpointSlice{}, resyncPeriod),
@@ -416,7 +409,7 @@ func (d *Discovery) Run(ctx context.Context, ch chan<- []*targetgroup.Group) {
 					return p.Watch(ctx, options)
 				},
 			}
-			eps := NewEndpoints(
+			eps := newEndpointsDiscoverer(
 				log.With(d.logger, "role", "endpoint"),
 				cache.NewSharedInformer(slw, &apiv1.Service{}, resyncPeriod),
 				cache.NewSharedInformer(elw, &apiv1.Endpoints{}, resyncPeriod),
@@ -442,7 +435,7 @@ func (d *Discovery) Run(ctx context.Context, ch chan<- []*targetgroup.Group) {
 					return p.Watch(ctx, options)
 				},
 			}
-			pod := NewPod(
+			pod := newPodDiscoverer(
 				log.With(d.logger, "role", "pod"),
 				cache.NewSharedInformer(plw, &apiv1.Pod{}, resyncPeriod),
 			)
@@ -464,7 +457,7 @@ func (d *Discovery) Run(ctx context.Context, ch chan<- []*targetgroup.Group) {
 					return s.Watch(ctx, options)
 				},
 			}
-			svc := NewService(
+			svc := newServiceDiscoverer(
 				log.With(d.logger, "role", "service"),
 				cache.NewSharedInformer(slw, &apiv1.Service{}, resyncPeriod),
 			)
@@ -486,7 +479,7 @@ func (d *Discovery) Run(ctx context.Context, ch chan<- []*targetgroup.Group) {
 					return i.Watch(ctx, options)
 				},
 			}
-			ingress := NewIngress(
+			ingress := newIngressDiscoverer(
 				log.With(d.logger, "role", "ingress"),
 				cache.NewSharedInformer(ilw, &v1beta1.Ingress{}, resyncPeriod),
 			)
@@ -506,7 +499,7 @@ func (d *Discovery) Run(ctx context.Context, ch chan<- []*targetgroup.Group) {
 				return d.client.CoreV1().Nodes().Watch(ctx, options)
 			},
 		}
-		node := NewNode(
+		node := newNodeDiscoverer(
 			log.With(d.logger, "role", "node"),
 			cache.NewSharedInformer(nlw, &apiv1.Node{}, resyncPeriod),
 		)

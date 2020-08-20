@@ -53,7 +53,7 @@ func makeEnumeratedNode(i int) *v1.Node {
 }
 
 func TestNodeDiscoveryBeforeStart(t *testing.T) {
-	n, c := makeDiscovery(RoleNode, NamespaceDiscovery{})
+	n, c := makeDiscovery(RoleNode, nil)
 
 	k8sDiscoveryTest{
 		discovery: n,
@@ -90,7 +90,7 @@ func TestNodeDiscoveryBeforeStart(t *testing.T) {
 }
 
 func TestNodeDiscoveryAdd(t *testing.T) {
-	n, c := makeDiscovery(RoleNode, NamespaceDiscovery{})
+	n, c := makeDiscovery(RoleNode, nil)
 
 	k8sDiscoveryTest{
 		discovery: n,
@@ -119,7 +119,7 @@ func TestNodeDiscoveryAdd(t *testing.T) {
 
 func TestNodeDiscoveryDelete(t *testing.T) {
 	obj := makeEnumeratedNode(0)
-	n, c := makeDiscovery(RoleNode, NamespaceDiscovery{}, obj)
+	n, c := makeDiscovery(RoleNode, nil, obj)
 
 	k8sDiscoveryTest{
 		discovery: n,
@@ -136,7 +136,7 @@ func TestNodeDiscoveryDelete(t *testing.T) {
 }
 
 func TestNodeDiscoveryUpdate(t *testing.T) {
-	n, c := makeDiscovery(RoleNode, NamespaceDiscovery{})
+	n, c := makeDiscovery(RoleNode, nil)
 
 	k8sDiscoveryTest{
 		discovery: n,

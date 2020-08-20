@@ -97,7 +97,7 @@ func makeExternalService() *v1.Service {
 }
 
 func TestServiceDiscoveryAdd(t *testing.T) {
-	n, c := makeDiscovery(RoleService, NamespaceDiscovery{})
+	n, c := makeDiscovery(RoleService, nil)
 
 	k8sDiscoveryTest{
 		discovery: n,
@@ -146,7 +146,7 @@ func TestServiceDiscoveryAdd(t *testing.T) {
 }
 
 func TestServiceDiscoveryDelete(t *testing.T) {
-	n, c := makeDiscovery(RoleService, NamespaceDiscovery{}, makeService())
+	n, c := makeDiscovery(RoleService, nil, makeService())
 
 	k8sDiscoveryTest{
 		discovery: n,
@@ -164,7 +164,7 @@ func TestServiceDiscoveryDelete(t *testing.T) {
 }
 
 func TestServiceDiscoveryUpdate(t *testing.T) {
-	n, c := makeDiscovery(RoleService, NamespaceDiscovery{}, makeService())
+	n, c := makeDiscovery(RoleService, nil, makeService())
 
 	k8sDiscoveryTest{
 		discovery: n,
@@ -206,7 +206,7 @@ func TestServiceDiscoveryUpdate(t *testing.T) {
 }
 
 func TestServiceDiscoveryNamespaces(t *testing.T) {
-	n, c := makeDiscovery(RoleService, NamespaceDiscovery{Names: []string{"ns1", "ns2"}})
+	n, c := makeDiscovery(RoleService, []string{"ns1", "ns2"})
 
 	k8sDiscoveryTest{
 		discovery: n,

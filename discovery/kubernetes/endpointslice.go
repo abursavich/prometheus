@@ -37,8 +37,8 @@ var (
 	epslDeleteCount = eventCount.WithLabelValues("endpointslice", "delete")
 )
 
-// EndpointSlice discovers new endpoint targets.
-type EndpointSlice struct {
+// endpointSliceDiscoverer discovers new endpoint targets.
+type endpointSliceDiscoverer struct {
 	logger log.Logger
 
 	endpointSliceInf cache.SharedInformer
@@ -52,12 +52,12 @@ type EndpointSlice struct {
 	queue *workqueue.Type
 }
 
-// NewEndpointSlice returns a new endpointslice discovery.
-func NewEndpointSlice(l log.Logger, svc, eps, pod cache.SharedInformer) *EndpointSlice {
+// newEndpointSliceDiscoverer returns a new endpointslice discovery.
+func newEndpointSliceDiscoverer(l log.Logger, svc, eps, pod cache.SharedInformer) *endpointSliceDiscoverer {
 	if l == nil {
 		l = log.NewNopLogger()
 	}
-	e := &EndpointSlice{
+	e := &endpointSliceDiscoverer{
 		logger:             l,
 		endpointSliceInf:   eps,
 		endpointSliceStore: eps.GetStore(),
@@ -118,7 +118,7 @@ func NewEndpointSlice(l log.Logger, svc, eps, pod cache.SharedInformer) *Endpoin
 	return e
 }
 
-func (e *EndpointSlice) enqueue(obj interface{}) {
+func (e *endpointSliceDiscoverer) enqueue(obj interface{}) {
 	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 	if err != nil {
 		return
@@ -128,7 +128,7 @@ func (e *EndpointSlice) enqueue(obj interface{}) {
 }
 
 // Run implements the Discoverer interface.
-func (e *EndpointSlice) Run(ctx context.Context, ch chan<- []*targetgroup.Group) {
+func (e *endpointSliceDiscoverer) Run(ctx context.Context, ch chan<- []*targetgroup.Group) {
 	defer e.queue.ShutDown()
 
 	if !cache.WaitForCacheSync(ctx.Done(), e.endpointSliceInf.HasSynced, e.serviceInf.HasSynced, e.podInf.HasSynced) {
@@ -147,7 +147,7 @@ func (e *EndpointSlice) Run(ctx context.Context, ch chan<- []*targetgroup.Group)
 	<-ctx.Done()
 }
 
-func (e *EndpointSlice) process(ctx context.Context, ch chan<- []*targetgroup.Group) bool {
+func (e *endpointSliceDiscoverer) process(ctx context.Context, ch chan<- []*targetgroup.Group) bool {
 	keyObj, quit := e.queue.Get()
 	if quit {
 		return false
@@ -211,7 +211,7 @@ const (
 	endpointSliceEndpointTopologyLabelPresentPrefix = metaLabelPrefix + "endpointslice_endpoint_topology_present_"
 )
 
-func (e *EndpointSlice) buildEndpointSlice(eps *disv1beta1.EndpointSlice) *targetgroup.Group {
+func (e *endpointSliceDiscoverer) buildEndpointSlice(eps *disv1beta1.EndpointSlice) *targetgroup.Group {
 	tg := &targetgroup.Group{
 		Source: endpointSliceSource(eps),
 	}
@@ -360,7 +360,7 @@ func (e *EndpointSlice) buildEndpointSlice(eps *disv1beta1.EndpointSlice) *targe
 	return tg
 }
 
-func (e *EndpointSlice) resolvePodRef(ref *apiv1.ObjectReference) *apiv1.Pod {
+func (e *endpointSliceDiscoverer) resolvePodRef(ref *apiv1.ObjectReference) *apiv1.Pod {
 	if ref == nil || ref.Kind != "Pod" {
 		return nil
 	}
@@ -379,7 +379,7 @@ func (e *EndpointSlice) resolvePodRef(ref *apiv1.ObjectReference) *apiv1.Pod {
 	return obj.(*apiv1.Pod)
 }
 
-func (e *EndpointSlice) addServiceLabels(eps *disv1beta1.EndpointSlice, tg *targetgroup.Group) {
+func (e *endpointSliceDiscoverer) addServiceLabels(eps *disv1beta1.EndpointSlice, tg *targetgroup.Group) {
 	var (
 		svc   = &apiv1.Service{}
 		found bool

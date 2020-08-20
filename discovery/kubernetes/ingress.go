@@ -34,17 +34,17 @@ var (
 	ingressDeleteCount = eventCount.WithLabelValues("ingress", "delete")
 )
 
-// Ingress implements discovery of Kubernetes ingress.
-type Ingress struct {
+// ingressDiscoverer implements discovery of Kubernetes ingress.
+type ingressDiscoverer struct {
 	logger   log.Logger
 	informer cache.SharedInformer
 	store    cache.Store
 	queue    *workqueue.Type
 }
 
-// NewIngress returns a new ingress discovery.
-func NewIngress(l log.Logger, inf cache.SharedInformer) *Ingress {
-	s := &Ingress{logger: l, informer: inf, store: inf.GetStore(), queue: workqueue.NewNamed("ingress")}
+// newIngressDiscoverer returns a new ingress discovery.
+func newIngressDiscoverer(l log.Logger, inf cache.SharedInformer) *ingressDiscoverer {
+	s := &ingressDiscoverer{logger: l, informer: inf, store: inf.GetStore(), queue: workqueue.NewNamed("ingress")}
 	s.informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(o interface{}) {
 			ingressAddCount.Inc()
@@ -62,7 +62,7 @@ func NewIngress(l log.Logger, inf cache.SharedInformer) *Ingress {
 	return s
 }
 
-func (i *Ingress) enqueue(obj interface{}) {
+func (i *ingressDiscoverer) enqueue(obj interface{}) {
 	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 	if err != nil {
 		return
@@ -72,7 +72,7 @@ func (i *Ingress) enqueue(obj interface{}) {
 }
 
 // Run implements the Discoverer interface.
-func (i *Ingress) Run(ctx context.Context, ch chan<- []*targetgroup.Group) {
+func (i *ingressDiscoverer) Run(ctx context.Context, ch chan<- []*targetgroup.Group) {
 	defer i.queue.ShutDown()
 
 	if !cache.WaitForCacheSync(ctx.Done(), i.informer.HasSynced) {
@@ -91,7 +91,7 @@ func (i *Ingress) Run(ctx context.Context, ch chan<- []*targetgroup.Group) {
 	<-ctx.Done()
 }
 
-func (i *Ingress) process(ctx context.Context, ch chan<- []*targetgroup.Group) bool {
+func (i *ingressDiscoverer) process(ctx context.Context, ch chan<- []*targetgroup.Group) bool {
 	keyObj, quit := i.queue.Get()
 	if quit {
 		return false
@@ -184,7 +184,7 @@ func pathsFromIngressRule(rv *v1beta1.IngressRuleValue) []string {
 	return paths
 }
 
-func (i *Ingress) buildIngress(ingress *v1beta1.Ingress) *targetgroup.Group {
+func (i *ingressDiscoverer) buildIngress(ingress *v1beta1.Ingress) *targetgroup.Group {
 	tg := &targetgroup.Group{
 		Source: ingressSource(ingress),
 	}

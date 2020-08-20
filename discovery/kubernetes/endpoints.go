@@ -35,8 +35,8 @@ var (
 	epDeleteCount = eventCount.WithLabelValues("endpoints", "delete")
 )
 
-// Endpoints discovers new endpoint targets.
-type Endpoints struct {
+// endpointsDiscoverer discovers new endpoint targets.
+type endpointsDiscoverer struct {
 	logger log.Logger
 
 	endpointsInf cache.SharedInformer
@@ -50,12 +50,12 @@ type Endpoints struct {
 	queue *workqueue.Type
 }
 
-// NewEndpoints returns a new endpoints discovery.
-func NewEndpoints(l log.Logger, svc, eps, pod cache.SharedInformer) *Endpoints {
+// newEndpointsDiscoverer returns a new endpoints discovery.
+func newEndpointsDiscoverer(l log.Logger, svc, eps, pod cache.SharedInformer) *endpointsDiscoverer {
 	if l == nil {
 		l = log.NewNopLogger()
 	}
-	e := &Endpoints{
+	e := &endpointsDiscoverer{
 		logger:         l,
 		endpointsInf:   eps,
 		endpointsStore: eps.GetStore(),
@@ -120,7 +120,7 @@ func NewEndpoints(l log.Logger, svc, eps, pod cache.SharedInformer) *Endpoints {
 	return e
 }
 
-func (e *Endpoints) enqueue(obj interface{}) {
+func (e *endpointsDiscoverer) enqueue(obj interface{}) {
 	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 	if err != nil {
 		return
@@ -130,7 +130,7 @@ func (e *Endpoints) enqueue(obj interface{}) {
 }
 
 // Run implements the Discoverer interface.
-func (e *Endpoints) Run(ctx context.Context, ch chan<- []*targetgroup.Group) {
+func (e *endpointsDiscoverer) Run(ctx context.Context, ch chan<- []*targetgroup.Group) {
 	defer e.queue.ShutDown()
 
 	if !cache.WaitForCacheSync(ctx.Done(), e.endpointsInf.HasSynced, e.serviceInf.HasSynced, e.podInf.HasSynced) {
@@ -149,7 +149,7 @@ func (e *Endpoints) Run(ctx context.Context, ch chan<- []*targetgroup.Group) {
 	<-ctx.Done()
 }
 
-func (e *Endpoints) process(ctx context.Context, ch chan<- []*targetgroup.Group) bool {
+func (e *endpointsDiscoverer) process(ctx context.Context, ch chan<- []*targetgroup.Group) bool {
 	keyObj, quit := e.queue.Get()
 	if quit {
 		return false
@@ -209,7 +209,7 @@ const (
 	endpointAddressTargetNameLabel = metaLabelPrefix + "endpoint_address_target_name"
 )
 
-func (e *Endpoints) buildEndpoints(eps *apiv1.Endpoints) *targetgroup.Group {
+func (e *endpointsDiscoverer) buildEndpoints(eps *apiv1.Endpoints) *targetgroup.Group {
 	tg := &targetgroup.Group{
 		Source: endpointsSource(eps),
 	}
@@ -333,7 +333,7 @@ func (e *Endpoints) buildEndpoints(eps *apiv1.Endpoints) *targetgroup.Group {
 	return tg
 }
 
-func (e *Endpoints) resolvePodRef(ref *apiv1.ObjectReference) *apiv1.Pod {
+func (e *endpointsDiscoverer) resolvePodRef(ref *apiv1.ObjectReference) *apiv1.Pod {
 	if ref == nil || ref.Kind != "Pod" {
 		return nil
 	}
@@ -352,7 +352,7 @@ func (e *Endpoints) resolvePodRef(ref *apiv1.ObjectReference) *apiv1.Pod {
 	return obj.(*apiv1.Pod)
 }
 
-func (e *Endpoints) addServiceLabels(ns, name string, tg *targetgroup.Group) {
+func (e *endpointsDiscoverer) addServiceLabels(ns, name string, tg *targetgroup.Group) {
 	svc := &apiv1.Service{}
 	svc.Namespace = ns
 	svc.Name = name

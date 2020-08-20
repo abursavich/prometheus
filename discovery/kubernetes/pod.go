@@ -38,20 +38,20 @@ var (
 	podDeleteCount = eventCount.WithLabelValues("pod", "delete")
 )
 
-// Pod discovers new pod targets.
-type Pod struct {
+// podDiscoverer discovers new pod targets.
+type podDiscoverer struct {
 	informer cache.SharedInformer
 	store    cache.Store
 	logger   log.Logger
 	queue    *workqueue.Type
 }
 
-// NewPod creates a new pod discovery.
-func NewPod(l log.Logger, pods cache.SharedInformer) *Pod {
+// newPodDiscoverer creates a new pod discovery.
+func newPodDiscoverer(l log.Logger, pods cache.SharedInformer) *podDiscoverer {
 	if l == nil {
 		l = log.NewNopLogger()
 	}
-	p := &Pod{
+	p := &podDiscoverer{
 		informer: pods,
 		store:    pods.GetStore(),
 		logger:   l,
@@ -74,7 +74,7 @@ func NewPod(l log.Logger, pods cache.SharedInformer) *Pod {
 	return p
 }
 
-func (p *Pod) enqueue(obj interface{}) {
+func (p *podDiscoverer) enqueue(obj interface{}) {
 	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 	if err != nil {
 		return
@@ -84,7 +84,7 @@ func (p *Pod) enqueue(obj interface{}) {
 }
 
 // Run implements the Discoverer interface.
-func (p *Pod) Run(ctx context.Context, ch chan<- []*targetgroup.Group) {
+func (p *podDiscoverer) Run(ctx context.Context, ch chan<- []*targetgroup.Group) {
 	defer p.queue.ShutDown()
 
 	if !cache.WaitForCacheSync(ctx.Done(), p.informer.HasSynced) {
@@ -103,7 +103,7 @@ func (p *Pod) Run(ctx context.Context, ch chan<- []*targetgroup.Group) {
 	<-ctx.Done()
 }
 
-func (p *Pod) process(ctx context.Context, ch chan<- []*targetgroup.Group) bool {
+func (p *podDiscoverer) process(ctx context.Context, ch chan<- []*targetgroup.Group) bool {
 	keyObj, quit := p.queue.Get()
 	if quit {
 		return false
@@ -210,7 +210,7 @@ func podLabels(pod *apiv1.Pod) model.LabelSet {
 	return ls
 }
 
-func (p *Pod) buildPod(pod *apiv1.Pod) *targetgroup.Group {
+func (p *podDiscoverer) buildPod(pod *apiv1.Pod) *targetgroup.Group {
 	tg := &targetgroup.Group{
 		Source: podSource(pod),
 	}

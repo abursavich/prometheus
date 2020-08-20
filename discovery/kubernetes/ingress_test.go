@@ -133,7 +133,7 @@ func expectedTargetGroups(ns string, tls TLSMode) map[string]*targetgroup.Group 
 }
 
 func TestIngressDiscoveryAdd(t *testing.T) {
-	n, c := makeDiscovery(RoleIngress, NamespaceDiscovery{Names: []string{"default"}})
+	n, c := makeDiscovery(RoleIngress, []string{"default"})
 
 	k8sDiscoveryTest{
 		discovery: n,
@@ -147,7 +147,7 @@ func TestIngressDiscoveryAdd(t *testing.T) {
 }
 
 func TestIngressDiscoveryAddTLS(t *testing.T) {
-	n, c := makeDiscovery(RoleIngress, NamespaceDiscovery{Names: []string{"default"}})
+	n, c := makeDiscovery(RoleIngress, []string{"default"})
 
 	k8sDiscoveryTest{
 		discovery: n,
@@ -161,7 +161,7 @@ func TestIngressDiscoveryAddTLS(t *testing.T) {
 }
 
 func TestIngressDiscoveryAddMixed(t *testing.T) {
-	n, c := makeDiscovery(RoleIngress, NamespaceDiscovery{Names: []string{"default"}})
+	n, c := makeDiscovery(RoleIngress, []string{"default"})
 
 	k8sDiscoveryTest{
 		discovery: n,
@@ -175,7 +175,7 @@ func TestIngressDiscoveryAddMixed(t *testing.T) {
 }
 
 func TestIngressDiscoveryNamespaces(t *testing.T) {
-	n, c := makeDiscovery(RoleIngress, NamespaceDiscovery{Names: []string{"ns1", "ns2"}})
+	n, c := makeDiscovery(RoleIngress, []string{"ns1", "ns2"})
 
 	expected := expectedTargetGroups("ns1", TLSNo)
 	for k, v := range expectedTargetGroups("ns2", TLSNo) {

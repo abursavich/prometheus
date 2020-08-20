@@ -367,7 +367,7 @@ var expectedConf = &Config{
 							KeyFile:  filepath.FromSlash("testdata/valid_key_file"),
 						},
 					},
-					NamespaceDiscovery: kubernetes.NamespaceDiscovery{},
+					Namespaces: kubernetes.Namespaces{},
 				},
 			},
 		},
@@ -391,7 +391,7 @@ var expectedConf = &Config{
 				&kubernetes.SDConfig{
 					APIServer: kubernetesSDHostURL(),
 					Role:      kubernetes.RoleEndpoint,
-					NamespaceDiscovery: kubernetes.NamespaceDiscovery{
+					Namespaces: kubernetes.Namespaces{
 						Names: []string{
 							"default",
 						},

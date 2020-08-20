@@ -79,7 +79,7 @@ func makeEndpointSlice() *disv1beta1.EndpointSlice {
 }
 
 func TestEndpointSliceDiscoveryBeforeRun(t *testing.T) {
-	n, c := makeDiscovery(RoleEndpointSlice, NamespaceDiscovery{})
+	n, c := makeDiscovery(RoleEndpointSlice, nil)
 
 	k8sDiscoveryTest{
 		discovery: n,
@@ -161,7 +161,7 @@ func TestEndpointSliceDiscoveryAdd(t *testing.T) {
 			PodIP:  "1.2.3.4",
 		},
 	}
-	n, c := makeDiscovery(RoleEndpointSlice, NamespaceDiscovery{}, obj)
+	n, c := makeDiscovery(RoleEndpointSlice, nil, obj)
 
 	k8sDiscoveryTest{
 		discovery: n,
@@ -246,7 +246,7 @@ func TestEndpointSliceDiscoveryAdd(t *testing.T) {
 }
 
 func TestEndpointSliceDiscoveryDelete(t *testing.T) {
-	n, c := makeDiscovery(RoleEndpointSlice, NamespaceDiscovery{}, makeEndpointSlice())
+	n, c := makeDiscovery(RoleEndpointSlice, nil, makeEndpointSlice())
 
 	k8sDiscoveryTest{
 		discovery: n,
@@ -264,7 +264,7 @@ func TestEndpointSliceDiscoveryDelete(t *testing.T) {
 }
 
 func TestEndpointSliceDiscoveryUpdate(t *testing.T) {
-	n, c := makeDiscovery(RoleEndpointSlice, NamespaceDiscovery{}, makeEndpointSlice())
+	n, c := makeDiscovery(RoleEndpointSlice, nil, makeEndpointSlice())
 
 	k8sDiscoveryTest{
 		discovery: n,
@@ -327,7 +327,7 @@ func TestEndpointSliceDiscoveryUpdate(t *testing.T) {
 }
 
 func TestEndpointSliceDiscoveryEmptyEndpoints(t *testing.T) {
-	n, c := makeDiscovery(RoleEndpointSlice, NamespaceDiscovery{}, makeEndpointSlice())
+	n, c := makeDiscovery(RoleEndpointSlice, nil, makeEndpointSlice())
 
 	k8sDiscoveryTest{
 		discovery: n,
@@ -364,7 +364,7 @@ func TestEndpointSliceDiscoveryEmptyEndpoints(t *testing.T) {
 }
 
 func TestEndpointSliceDiscoveryWithService(t *testing.T) {
-	n, c := makeDiscovery(RoleEndpointSlice, NamespaceDiscovery{}, makeEndpointSlice())
+	n, c := makeDiscovery(RoleEndpointSlice, nil, makeEndpointSlice())
 
 	k8sDiscoveryTest{
 		discovery: n,
@@ -421,7 +421,7 @@ func TestEndpointSliceDiscoveryWithService(t *testing.T) {
 }
 
 func TestEndpointSliceDiscoveryWithServiceUpdate(t *testing.T) {
-	n, c := makeDiscovery(RoleEndpointSlice, NamespaceDiscovery{}, makeEndpointSlice())
+	n, c := makeDiscovery(RoleEndpointSlice, nil, makeEndpointSlice())
 
 	k8sDiscoveryTest{
 		discovery: n,
@@ -557,7 +557,7 @@ func TestEndpointSliceDiscoveryNamespaces(t *testing.T) {
 			},
 		},
 	}
-	n, _ := makeDiscovery(RoleEndpointSlice, NamespaceDiscovery{Names: []string{"ns1", "ns2"}}, objs...)
+	n, _ := makeDiscovery(RoleEndpointSlice, []string{"ns1", "ns2"}, objs...)
 
 	k8sDiscoveryTest{
 		discovery:        n,
