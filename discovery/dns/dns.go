@@ -36,6 +36,7 @@ import (
 const (
 	resolvConf = "/etc/resolv.conf"
 
+	dnsName                 = "dns"
 	dnsNameLabel            = model.MetaLabelPrefix + "dns_name"
 	dnsSrvRecordPrefix      = model.MetaLabelPrefix + "dns_srv_record_"
 	dnsSrvRecordTargetLabel = dnsSrvRecordPrefix + "target"
@@ -81,11 +82,15 @@ type SDConfig struct {
 }
 
 // Name returns the name of the Config.
-func (*SDConfig) Name() string { return "dns" }
+func (*SDConfig) Name() string { return dnsName }
 
 // NewDiscoverer returns a Discoverer for the Config.
 func (c *SDConfig) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
-	return NewDiscovery(*c, opts.Logger), nil
+	return refresh.NewDiscoverer(
+		opts.Logger,
+		time.Duration(c.RefreshInterval),
+		newRefresher(*c, opts.Logger),
+	), nil
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
@@ -111,10 +116,7 @@ func (c *SDConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return nil
 }
 
-// Discovery periodically performs DNS-SD requests. It implements
-// the Discoverer interface.
-type Discovery struct {
-	discovery.Discoverer
+type refresher struct {
 	names  []string
 	port   int
 	qtype  uint16
@@ -123,8 +125,7 @@ type Discovery struct {
 	lookupFn func(name string, qtype uint16, logger log.Logger) (*dns.Msg, error)
 }
 
-// NewDiscovery returns a new Discovery which periodically refreshes its targets.
-func NewDiscovery(conf SDConfig, logger log.Logger) *Discovery {
+func newRefresher(conf SDConfig, logger log.Logger) *refresher {
 	if logger == nil {
 		logger = log.NewNopLogger()
 	}
@@ -138,34 +139,29 @@ func NewDiscovery(conf SDConfig, logger log.Logger) *Discovery {
 	case "SRV":
 		qtype = dns.TypeSRV
 	}
-	d := &Discovery{
+	return &refresher{
 		names:    conf.Names,
 		qtype:    qtype,
 		port:     conf.Port,
 		logger:   logger,
 		lookupFn: lookupWithSearchPath,
 	}
-	d.Discoverer = refresh.NewDiscovery(
-		logger,
-		"dns",
-		time.Duration(conf.RefreshInterval),
-		d.refresh,
-	)
-	return d
 }
 
-func (d *Discovery) refresh(ctx context.Context) ([]*targetgroup.Group, error) {
+func (*refresher) Name() string { return dnsName }
+
+func (r *refresher) Refresh(ctx context.Context) ([]*targetgroup.Group, error) {
 	var (
 		wg  sync.WaitGroup
 		ch  = make(chan *targetgroup.Group)
-		tgs = make([]*targetgroup.Group, 0, len(d.names))
+		tgs = make([]*targetgroup.Group, 0, len(r.names))
 	)
 
-	wg.Add(len(d.names))
-	for _, name := range d.names {
+	wg.Add(len(r.names))
+	for _, name := range r.names {
 		go func(n string) {
-			if err := d.refreshOne(ctx, n, ch); err != nil && err != context.Canceled {
-				level.Error(d.logger).Log("msg", "Error refreshing DNS targets", "err", err)
+			if err := r.refreshOne(ctx, n, ch); err != nil && err != context.Canceled {
+				level.Error(r.logger).Log("msg", "Error refreshing DNS targets", "err", err)
 			}
 			wg.Done()
 		}(name)
@@ -182,8 +178,8 @@ func (d *Discovery) refresh(ctx context.Context) ([]*targetgroup.Group, error) {
 	return tgs, nil
 }
 
-func (d *Discovery) refreshOne(ctx context.Context, name string, ch chan<- *targetgroup.Group) error {
-	response, err := d.lookupFn(name, d.qtype, d.logger)
+func (r *refresher) refreshOne(ctx context.Context, name string, ch chan<- *targetgroup.Group) error {
+	response, err := r.lookupFn(name, r.qtype, r.logger)
 	dnsSDLookupsCount.Inc()
 	if err != nil {
 		dnsSDLookupFailuresCount.Inc()
@@ -208,11 +204,11 @@ func (d *Discovery) refreshOne(ctx context.Context, name string, ch chan<- *targ
 
 			target = hostPort(addr.Target, int(addr.Port))
 		case *dns.A:
-			target = hostPort(addr.A.String(), d.port)
+			target = hostPort(addr.A.String(), r.port)
 		case *dns.AAAA:
-			target = hostPort(addr.AAAA.String(), d.port)
+			target = hostPort(addr.AAAA.String(), r.port)
 		default:
-			level.Warn(d.logger).Log("msg", "Invalid SRV record", "record", record)
+			level.Warn(r.logger).Log("msg", "Invalid SRV record", "record", record)
 			continue
 		}
 		tg.Targets = append(tg.Targets, model.LabelSet{

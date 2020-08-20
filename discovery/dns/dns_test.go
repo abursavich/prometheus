@@ -201,10 +201,10 @@ func TestDNS(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			sd := NewDiscovery(tc.config, nil)
-			sd.lookupFn = tc.lookup
+			r := newRefresher(tc.config, nil)
+			r.lookupFn = tc.lookup
 
-			tgs, err := sd.refresh(context.Background())
+			tgs, err := r.Refresh(context.Background())
 			testutil.Ok(t, err)
 			testutil.Equals(t, tc.expected, tgs)
 		})
