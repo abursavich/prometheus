@@ -26,7 +26,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/go-kit/kit/log"
 	"github.com/pkg/errors"
 	"github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
@@ -38,7 +37,8 @@ import (
 )
 
 const (
-	ec2Label                  = model.MetaLabelPrefix + "ec2_"
+	ec2Name                   = "ec2"
+	ec2Label                  = model.MetaLabelPrefix + ec2Name + "_"
 	ec2LabelAMI               = ec2Label + "ami"
 	ec2LabelAZ                = ec2Label + "availability_zone"
 	ec2LabelArch              = ec2Label + "architecture"
@@ -89,11 +89,15 @@ type SDConfig struct {
 }
 
 // Name returns the name of the Config.
-func (*SDConfig) Name() string { return "ec2" }
+func (*SDConfig) Name() string { return ec2Name }
 
 // NewDiscoverer returns a Discoverer for the Config.
 func (c *SDConfig) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
-	return NewDiscovery(c, opts.Logger), nil
+	return refresh.NewDiscoverer(
+		opts.Logger,
+		time.Duration(c.RefreshInterval),
+		newRefresher(c),
+	), nil
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
@@ -124,70 +128,57 @@ func (c *SDConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return nil
 }
 
-// Discovery periodically performs EC2-SD requests. It implements
-// the Discoverer interface.
-type Discovery struct {
-	discovery.Discoverer
-	aws      *aws.Config
-	interval time.Duration
-	profile  string
-	roleARN  string
-	port     int
-	filters  []*Filter
+type refresher struct {
+	aws     *aws.Config
+	profile string
+	roleARN string
+	port    int
+	filters []*Filter
 }
 
-// NewDiscovery returns a new EC2Discovery which periodically refreshes its targets.
-func NewDiscovery(conf *SDConfig, logger log.Logger) *Discovery {
+// newRefresher returns a new EC2Discovery which periodically refreshes its targets.
+func newRefresher(conf *SDConfig) *refresher {
 	creds := credentials.NewStaticCredentials(conf.AccessKey, string(conf.SecretKey), "")
 	if conf.AccessKey == "" && conf.SecretKey == "" {
 		creds = nil
 	}
-	if logger == nil {
-		logger = log.NewNopLogger()
-	}
-	d := &Discovery{
+	return &refresher{
 		aws: &aws.Config{
 			Endpoint:    &conf.Endpoint,
 			Region:      &conf.Region,
 			Credentials: creds,
 		},
-		profile:  conf.Profile,
-		roleARN:  conf.RoleARN,
-		filters:  conf.Filters,
-		interval: time.Duration(conf.RefreshInterval),
-		port:     conf.Port,
+		profile: conf.Profile,
+		roleARN: conf.RoleARN,
+		filters: conf.Filters,
+		port:    conf.Port,
 	}
-	d.Discoverer = refresh.NewDiscovery(
-		logger,
-		"ec2",
-		time.Duration(conf.RefreshInterval),
-		d.refresh,
-	)
-	return d
 }
 
-func (d *Discovery) refresh(ctx context.Context) ([]*targetgroup.Group, error) {
+func (*refresher) Name() string { return ec2Name }
+
+func (r *refresher) Refresh(ctx context.Context) ([]*targetgroup.Group, error) {
 	sess, err := session.NewSessionWithOptions(session.Options{
-		Config:  *d.aws,
-		Profile: d.profile,
+		Config:  *r.aws,
+		Profile: r.profile,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "could not create aws session")
 	}
 
 	var ec2s *ec2.EC2
-	if d.roleARN != "" {
-		creds := stscreds.NewCredentials(sess, d.roleARN)
+	if r.roleARN != "" {
+		creds := stscreds.NewCredentials(sess, r.roleARN)
 		ec2s = ec2.New(sess, &aws.Config{Credentials: creds})
 	} else {
 		ec2s = ec2.New(sess)
 	}
 	tg := &targetgroup.Group{
-		Source: *d.aws.Region,
+		Source: *r.aws.Region,
 	}
 
 	var filters []*ec2.Filter
-	for _, f := range d.filters {
+	for _, f := range r.filters {
 		filters = append(filters, &ec2.Filter{
 			Name:   aws.String(f.Name),
 			Values: aws.StringSlice(f.Values),
@@ -197,8 +188,8 @@ func (d *Discovery) refresh(ctx context.Context) ([]*targetgroup.Group, error) {
 	input := &ec2.DescribeInstancesInput{Filters: filters}
 
 	if err = ec2s.DescribeInstancesPagesWithContext(ctx, input, func(p *ec2.DescribeInstancesOutput, lastPage bool) bool {
-		for _, r := range p.Reservations {
-			for _, inst := range r.Instances {
+		for _, res := range p.Reservations {
+			for _, inst := range res.Instances {
 				if inst.PrivateIpAddress == nil {
 					continue
 				}
@@ -206,15 +197,15 @@ func (d *Discovery) refresh(ctx context.Context) ([]*targetgroup.Group, error) {
 					ec2LabelInstanceID: model.LabelValue(*inst.InstanceId),
 				}
 
-				if r.OwnerId != nil {
-					labels[ec2LabelOwnerID] = model.LabelValue(*r.OwnerId)
+				if res.OwnerId != nil {
+					labels[ec2LabelOwnerID] = model.LabelValue(*res.OwnerId)
 				}
 
 				labels[ec2LabelPrivateIP] = model.LabelValue(*inst.PrivateIpAddress)
 				if inst.PrivateDnsName != nil {
 					labels[ec2LabelPrivateDNS] = model.LabelValue(*inst.PrivateDnsName)
 				}
-				addr := net.JoinHostPort(*inst.PrivateIpAddress, fmt.Sprintf("%d", d.port))
+				addr := net.JoinHostPort(*inst.PrivateIpAddress, fmt.Sprintf("%d", r.port))
 				labels[model.AddressLabel] = model.LabelValue(addr)
 
 				if inst.Platform != nil {
