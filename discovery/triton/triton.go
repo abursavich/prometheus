@@ -19,12 +19,13 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
-	"github.com/go-kit/kit/log"
 	conntrack "github.com/mwitkow/go-conntrack"
 	"github.com/pkg/errors"
 	"github.com/prometheus/common/config"
@@ -36,7 +37,8 @@ import (
 )
 
 const (
-	tritonLabel             = model.MetaLabelPrefix + "triton_"
+	tritonName              = "triton"
+	tritonLabel             = model.MetaLabelPrefix + tritonName + "_"
 	tritonLabelGroups       = tritonLabel + "groups"
 	tritonLabelMachineID    = tritonLabel + "machine_id"
 	tritonLabelMachineAlias = tritonLabel + "machine_alias"
@@ -63,19 +65,23 @@ type SDConfig struct {
 	Role            string           `yaml:"role"`
 	DNSSuffix       string           `yaml:"dns_suffix"`
 	Endpoint        string           `yaml:"endpoint"`
-	Groups          []string         `yaml:"groups,omitempty"`
 	Port            int              `yaml:"port"`
+	Groups          []string         `yaml:"groups,omitempty"`
 	RefreshInterval model.Duration   `yaml:"refresh_interval,omitempty"`
 	TLSConfig       config.TLSConfig `yaml:"tls_config,omitempty"`
 	Version         int              `yaml:"version"`
 }
 
 // Name returns the name of the Config.
-func (*SDConfig) Name() string { return "triton" }
+func (*SDConfig) Name() string { return tritonName }
 
 // NewDiscoverer returns a Discoverer for the Config.
 func (c *SDConfig) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
-	return New(opts.Logger, c)
+	r, err := newRefresher(c)
+	if err != nil {
+		return nil, err
+	}
+	return refresh.NewDiscoverer(opts.Logger, time.Duration(c.RefreshInterval), r), nil
 }
 
 // SetDirectory joins any relative file paths with dir.
@@ -109,63 +115,56 @@ func (c *SDConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return nil
 }
 
-// DiscoveryResponse models a JSON response from the Triton discovery.
-type DiscoveryResponse struct {
-	Containers []struct {
-		Groups      []string `json:"groups"`
-		ServerUUID  string   `json:"server_uuid"`
-		VMAlias     string   `json:"vm_alias"`
-		VMBrand     string   `json:"vm_brand"`
-		VMImageUUID string   `json:"vm_image_uuid"`
-		VMUUID      string   `json:"vm_uuid"`
-	} `json:"containers"`
+func (c *SDConfig) url() (*url.URL, error) {
+	u := &url.URL{
+		Scheme: "https",
+		Host:   net.JoinHostPort(c.Endpoint, strconv.Itoa(c.Port)),
+		Path:   fmt.Sprintf("/v%d", c.Version),
+	}
+	switch c.Role {
+	case "container":
+		u.Path += "/discover"
+	case "cn":
+		u.Path += "/gz/discover"
+	default:
+		return nil, fmt.Errorf("unknown role %q in configuration", c.Role)
+	}
+	if len(c.Groups) > 0 {
+		qry := u.Query()
+		qry.Set("groups", strings.Join(c.Groups, ","))
+		u.RawQuery = qry.Encode()
+	}
+	return u, nil
 }
 
-// ComputeNodeDiscoveryResponse models a JSON response from the Triton discovery /gz/ endpoint.
-type ComputeNodeDiscoveryResponse struct {
-	ComputeNodes []struct {
-		ServerUUID     string `json:"server_uuid"`
-		ServerHostname string `json:"server_hostname"`
-	} `json:"cns"`
+type refresher struct {
+	client *http.Client
+	config *SDConfig
+	url    string
 }
 
-// Discovery periodically performs Triton-SD requests. It implements
-// the Discoverer interface.
-type Discovery struct {
-	discovery.Discoverer
-	client   *http.Client
-	interval time.Duration
-	sdConfig *SDConfig
-}
-
-// New returns a new Discovery which periodically refreshes its targets.
-func New(logger log.Logger, conf *SDConfig) (*Discovery, error) {
-	tls, err := config.NewTLSConfig(&conf.TLSConfig)
+func newRefresher(c *SDConfig) (*refresher, error) {
+	u, err := c.url()
 	if err != nil {
 		return nil, err
 	}
-
-	transport := &http.Transport{
-		TLSClientConfig: tls,
-		DialContext: conntrack.NewDialContextFunc(
-			conntrack.DialWithTracing(),
-			conntrack.DialWithName("triton_sd"),
-		),
+	tls, err := config.NewTLSConfig(&c.TLSConfig)
+	if err != nil {
+		return nil, err
 	}
-	client := &http.Client{Transport: transport}
-
-	d := &Discovery{
-		client:   client,
-		interval: time.Duration(conf.RefreshInterval),
-		sdConfig: conf,
-	}
-	d.Discoverer = refresh.NewDiscovery(
-		logger,
-		"triton",
-		time.Duration(conf.RefreshInterval),
-		d.refresh,
-	)
-	return d, nil
+	return &refresher{
+		client: &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: tls,
+				DialContext: conntrack.NewDialContextFunc(
+					conntrack.DialWithTracing(),
+					conntrack.DialWithName("triton_sd"),
+				),
+			},
+		},
+		config: c,
+		url:    u.String(),
+	}, nil
 }
 
 // triton-cmon has two discovery endpoints:
@@ -180,28 +179,15 @@ func New(logger log.Logger, conf *SDConfig) (*Discovery, error) {
 // As triton is not internally consistent in using these names,
 // the terms as used in triton-cmon are used here.
 
-func (d *Discovery) refresh(ctx context.Context) ([]*targetgroup.Group, error) {
-	var endpointFormat string
-	switch d.sdConfig.Role {
-	case "container":
-		endpointFormat = "https://%s:%d/v%d/discover"
-	case "cn":
-		endpointFormat = "https://%s:%d/v%d/gz/discover"
-	default:
-		return nil, errors.New(fmt.Sprintf("unknown role '%s' in configuration", d.sdConfig.Role))
-	}
-	var endpoint = fmt.Sprintf(endpointFormat, d.sdConfig.Endpoint, d.sdConfig.Port, d.sdConfig.Version)
-	if len(d.sdConfig.Groups) > 0 {
-		groups := url.QueryEscape(strings.Join(d.sdConfig.Groups, ","))
-		endpoint = fmt.Sprintf("%s?groups=%s", endpoint, groups)
-	}
+func (*refresher) Name() string { return tritonName }
 
-	req, err := http.NewRequest("GET", endpoint, nil)
+func (r *refresher) Refresh(ctx context.Context) ([]*targetgroup.Group, error) {
+	req, err := http.NewRequest("GET", r.url, nil)
 	if err != nil {
 		return nil, err
 	}
 	req = req.WithContext(ctx)
-	resp, err := d.client.Do(req)
+	resp, err := r.client.Do(req)
 	if err != nil {
 		return nil, errors.Wrap(err, "an error occurred when requesting targets from the discovery endpoint")
 	}
@@ -217,28 +203,36 @@ func (d *Discovery) refresh(ctx context.Context) ([]*targetgroup.Group, error) {
 	}
 
 	// The JSON response body is different so it needs to be processed/mapped separately.
-	switch d.sdConfig.Role {
+	switch r.config.Role {
 	case "container":
-		return d.processContainerResponse(data, endpoint)
+		return r.processContainerResponse(data)
 	case "cn":
-		return d.processComputeNodeResponse(data, endpoint)
+		return r.processComputeNodeResponse(data)
 	default:
-		return nil, errors.New(fmt.Sprintf("unknown role '%s' in configuration", d.sdConfig.Role))
+		return nil, fmt.Errorf("unknown role %q in configuration", r.config.Role)
 	}
 }
 
-func (d *Discovery) processContainerResponse(data []byte, endpoint string) ([]*targetgroup.Group, error) {
-	tg := &targetgroup.Group{
-		Source: endpoint,
+func (r *refresher) processContainerResponse(data []byte) ([]*targetgroup.Group, error) {
+	type response struct {
+		Containers []struct {
+			Groups      []string `json:"groups"`
+			ServerUUID  string   `json:"server_uuid"`
+			VMAlias     string   `json:"vm_alias"`
+			VMBrand     string   `json:"vm_brand"`
+			VMImageUUID string   `json:"vm_image_uuid"`
+			VMUUID      string   `json:"vm_uuid"`
+		} `json:"containers"`
 	}
-
-	dr := DiscoveryResponse{}
-	err := json.Unmarshal(data, &dr)
-	if err != nil {
+	var resp response
+	if err := json.Unmarshal(data, &resp); err != nil {
 		return nil, errors.Wrap(err, "an error occurred unmarshaling the discovery response json")
 	}
 
-	for _, container := range dr.Containers {
+	tg := &targetgroup.Group{
+		Source: r.url,
+	}
+	for _, container := range resp.Containers {
 		labels := model.LabelSet{
 			tritonLabelMachineID:    model.LabelValue(container.VMUUID),
 			tritonLabelMachineAlias: model.LabelValue(container.VMAlias),
@@ -246,7 +240,7 @@ func (d *Discovery) processContainerResponse(data []byte, endpoint string) ([]*t
 			tritonLabelMachineImage: model.LabelValue(container.VMImageUUID),
 			tritonLabelServerID:     model.LabelValue(container.ServerUUID),
 		}
-		addr := fmt.Sprintf("%s.%s:%d", container.VMUUID, d.sdConfig.DNSSuffix, d.sdConfig.Port)
+		addr := fmt.Sprintf("%s.%s:%d", container.VMUUID, r.config.DNSSuffix, r.config.Port)
 		labels[model.AddressLabel] = model.LabelValue(addr)
 
 		if len(container.Groups) > 0 {
@@ -256,31 +250,33 @@ func (d *Discovery) processContainerResponse(data []byte, endpoint string) ([]*t
 
 		tg.Targets = append(tg.Targets, labels)
 	}
-
 	return []*targetgroup.Group{tg}, nil
 }
 
-func (d *Discovery) processComputeNodeResponse(data []byte, endpoint string) ([]*targetgroup.Group, error) {
-	tg := &targetgroup.Group{
-		Source: endpoint,
+func (r *refresher) processComputeNodeResponse(data []byte) ([]*targetgroup.Group, error) {
+	type response struct {
+		ComputeNodes []struct {
+			ServerUUID     string `json:"server_uuid"`
+			ServerHostname string `json:"server_hostname"`
+		} `json:"cns"`
 	}
-
-	dr := ComputeNodeDiscoveryResponse{}
-	err := json.Unmarshal(data, &dr)
-	if err != nil {
+	var resp response
+	if err := json.Unmarshal(data, &resp); err != nil {
 		return nil, errors.Wrap(err, "an error occurred unmarshaling the compute node discovery response json")
 	}
 
-	for _, cn := range dr.ComputeNodes {
+	tg := &targetgroup.Group{
+		Source: r.url,
+	}
+	for _, cn := range resp.ComputeNodes {
 		labels := model.LabelSet{
 			tritonLabelMachineID:    model.LabelValue(cn.ServerUUID),
 			tritonLabelMachineAlias: model.LabelValue(cn.ServerHostname),
 		}
-		addr := fmt.Sprintf("%s.%s:%d", cn.ServerUUID, d.sdConfig.DNSSuffix, d.sdConfig.Port)
+		addr := fmt.Sprintf("%s.%s:%d", cn.ServerUUID, r.config.DNSSuffix, r.config.Port)
 		labels[model.AddressLabel] = model.LabelValue(addr)
 
 		tg.Targets = append(tg.Targets, labels)
 	}
-
 	return []*targetgroup.Group{tg}, nil
 }
