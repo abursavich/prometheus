@@ -88,3 +88,13 @@ func TestRefresh(t *testing.T) {
 	case <-tick.C:
 	}
 }
+
+type refresher struct {
+	name    string
+	refresh func(ctx context.Context) ([]*targetgroup.Group, error)
+}
+
+func (r *refresher) Name() string { return r.name }
+func (r *refresher) Refresh(ctx context.Context) ([]*targetgroup.Group, error) {
+	return r.refresh(ctx)
+}
