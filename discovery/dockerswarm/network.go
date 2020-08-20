@@ -31,8 +31,8 @@ const (
 	swarmLabelNetworkLabelPrefix = swarmLabelNetworkPrefix + "label_"
 )
 
-func (d *Discovery) getNetworksLabels(ctx context.Context) (map[string]map[string]string, error) {
-	networks, err := d.client.NetworkList(ctx, types.NetworkListOptions{})
+func (r *refresher) getNetworksLabels(ctx context.Context) (map[string]map[string]string, error) {
+	networks, err := r.client.NetworkList(ctx, types.NetworkListOptions{})
 	if err != nil {
 		return nil, err
 	}

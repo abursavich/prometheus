@@ -43,12 +43,12 @@ const (
 	swarmLabelNodeStatus               = swarmLabelNodePrefix + "status"
 )
 
-func (d *Discovery) refreshNodes(ctx context.Context) ([]*targetgroup.Group, error) {
+func (r *refresher) refreshNodes(ctx context.Context) ([]*targetgroup.Group, error) {
 	tg := &targetgroup.Group{
 		Source: "DockerSwarm",
 	}
 
-	nodes, err := d.client.NodeList(ctx, types.NodeListOptions{})
+	nodes, err := r.client.NodeList(ctx, types.NodeListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("error while listing swarm nodes: %w", err)
 	}
@@ -76,7 +76,7 @@ func (d *Discovery) refreshNodes(ctx context.Context) ([]*targetgroup.Group, err
 			labels[model.LabelName(swarmLabelNodeLabelPrefix+ln)] = model.LabelValue(v)
 		}
 
-		addr := net.JoinHostPort(n.Status.Addr, strconv.FormatUint(uint64(d.port), 10))
+		addr := net.JoinHostPort(n.Status.Addr, strconv.FormatUint(uint64(r.port), 10))
 		labels[model.AddressLabel] = model.LabelValue(addr)
 
 		tg.Targets = append(tg.Targets, labels)
@@ -85,8 +85,8 @@ func (d *Discovery) refreshNodes(ctx context.Context) ([]*targetgroup.Group, err
 	return []*targetgroup.Group{tg}, nil
 }
 
-func (d *Discovery) getNodesLabels(ctx context.Context) (map[string]map[string]string, error) {
-	nodes, err := d.client.NodeList(ctx, types.NodeListOptions{})
+func (r *refresher) getNodesLabels(ctx context.Context) (map[string]map[string]string, error) {
+	nodes, err := r.client.NodeList(ctx, types.NodeListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("error while listing swarm nodes: %w", err)
 	}

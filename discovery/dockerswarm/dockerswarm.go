@@ -32,7 +32,8 @@ import (
 )
 
 const (
-	swarmLabel = model.MetaLabelPrefix + "dockerswarm_"
+	swarmName  = "dockerswarm"
+	swarmLabel = model.MetaLabelPrefix + swarmName + "_"
 )
 
 var userAgent = fmt.Sprintf("Prometheus/%s", version.Version)
@@ -59,11 +60,15 @@ type SDConfig struct {
 }
 
 // Name returns the name of the Config.
-func (*SDConfig) Name() string { return "dockerswarm" }
+func (*SDConfig) Name() string { return swarmName }
 
 // NewDiscoverer returns a Discoverer for the Config.
 func (c *SDConfig) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
-	return NewDiscovery(c, opts.Logger)
+	r, err := newRefresher(c, opts.Logger)
+	if err != nil {
+		return nil, err
+	}
+	return refresh.NewDiscoverer(opts.Logger, time.Duration(c.RefreshInterval), r), nil
 }
 
 // SetDirectory joins any relative file paths with dir.
@@ -95,24 +100,16 @@ func (c *SDConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return nil
 }
 
-// Discovery periodically performs Docker Swarm requests. It implements
+// refresher periodically performs Docker Swarm requests. It implements
 // the Discoverer interface.
-type Discovery struct {
-	discovery.Discoverer
+type refresher struct {
 	client *client.Client
 	role   string
 	port   int
 }
 
-// NewDiscovery returns a new Discovery which periodically refreshes its targets.
-func NewDiscovery(conf *SDConfig, logger log.Logger) (*Discovery, error) {
-	var err error
-
-	d := &Discovery{
-		port: conf.Port,
-		role: conf.Role,
-	}
-
+// newRefresher returns a new Discovery which periodically refreshes its targets.
+func newRefresher(conf *SDConfig, logger log.Logger) (*refresher, error) {
 	hostURL, err := url.Parse(conf.Host)
 	if err != nil {
 		return nil, err
@@ -143,29 +140,29 @@ func NewDiscovery(conf *SDConfig, logger log.Logger) (*Discovery, error) {
 		)
 	}
 
-	d.client, err = client.NewClientWithOpts(opts...)
+	client, err := client.NewClientWithOpts(opts...)
 	if err != nil {
 		return nil, fmt.Errorf("error setting up docker swarm client: %w", err)
 	}
 
-	d.Discoverer = refresh.NewDiscovery(
-		logger,
-		"dockerswarm",
-		time.Duration(conf.RefreshInterval),
-		d.refresh,
-	)
-	return d, nil
+	return &refresher{
+		client: client,
+		port:   conf.Port,
+		role:   conf.Role,
+	}, nil
 }
 
-func (d *Discovery) refresh(ctx context.Context) ([]*targetgroup.Group, error) {
-	switch d.role {
+func (*refresher) Name() string { return swarmName }
+
+func (r *refresher) Refresh(ctx context.Context) ([]*targetgroup.Group, error) {
+	switch r.role {
 	case "services":
-		return d.refreshServices(ctx)
+		return r.refreshServices(ctx)
 	case "nodes":
-		return d.refreshNodes(ctx)
+		return r.refreshNodes(ctx)
 	case "tasks":
-		return d.refreshTasks(ctx)
+		return r.refreshTasks(ctx)
 	default:
-		panic(fmt.Errorf("unexpected role %s", d.role))
+		panic(fmt.Errorf("unexpected role %s", r.role))
 	}
 }

@@ -38,11 +38,11 @@ host: %s
 	var cfg SDConfig
 	testutil.Ok(t, yaml.Unmarshal([]byte(cfgString), &cfg))
 
-	d, err := NewDiscovery(&cfg, log.NewNopLogger())
+	r, err := newRefresher(&cfg, log.NewNopLogger())
 	testutil.Ok(t, err)
 
 	ctx := context.Background()
-	tgs, err := d.refresh(ctx)
+	tgs, err := r.Refresh(ctx)
 	testutil.Ok(t, err)
 
 	testutil.Equals(t, 1, len(tgs))

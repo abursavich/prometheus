@@ -41,17 +41,17 @@ const (
 	swarmLabelServiceTaskContainerHostname   = swarmLabelServiceTaskPrefix + "container_hostname"
 )
 
-func (d *Discovery) refreshServices(ctx context.Context) ([]*targetgroup.Group, error) {
+func (r *refresher) refreshServices(ctx context.Context) ([]*targetgroup.Group, error) {
 	tg := &targetgroup.Group{
 		Source: "DockerSwarm",
 	}
 
-	services, err := d.client.ServiceList(ctx, types.ServiceListOptions{})
+	services, err := r.client.ServiceList(ctx, types.ServiceListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("error while listing swarm services: %w", err)
 	}
 
-	networkLabels, err := d.getNetworksLabels(ctx)
+	networkLabels, err := r.getNetworksLabels(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error while computing swarm network labels: %w", err)
 	}
@@ -116,7 +116,7 @@ func (d *Discovery) refreshServices(ctx context.Context) ([]*targetgroup.Group, 
 					labels[model.LabelName(k)] = model.LabelValue(v)
 				}
 
-				addr := net.JoinHostPort(ip.String(), fmt.Sprintf("%d", d.port))
+				addr := net.JoinHostPort(ip.String(), fmt.Sprintf("%d", r.port))
 				labels[model.AddressLabel] = model.LabelValue(addr)
 
 				tg.Targets = append(tg.Targets, labels)
@@ -126,8 +126,8 @@ func (d *Discovery) refreshServices(ctx context.Context) ([]*targetgroup.Group, 
 	return []*targetgroup.Group{tg}, nil
 }
 
-func (d *Discovery) getServicesLabelsAndPorts(ctx context.Context) (map[string]map[string]string, map[string][]swarm.PortConfig, error) {
-	services, err := d.client.ServiceList(ctx, types.ServiceListOptions{})
+func (r *refresher) getServicesLabelsAndPorts(ctx context.Context) (map[string]map[string]string, map[string][]swarm.PortConfig, error) {
+	services, err := r.client.ServiceList(ctx, types.ServiceListOptions{})
 	if err != nil {
 		return nil, nil, err
 	}
