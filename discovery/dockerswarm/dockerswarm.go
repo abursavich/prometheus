@@ -98,7 +98,7 @@ func (c *SDConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 // Discovery periodically performs Docker Swarm requests. It implements
 // the Discoverer interface.
 type Discovery struct {
-	*refresh.Discovery
+	discovery.Discoverer
 	client *client.Client
 	role   string
 	port   int
@@ -148,7 +148,7 @@ func NewDiscovery(conf *SDConfig, logger log.Logger) (*Discovery, error) {
 		return nil, fmt.Errorf("error setting up docker swarm client: %w", err)
 	}
 
-	d.Discovery = refresh.NewDiscovery(
+	d.Discoverer = refresh.NewDiscovery(
 		logger,
 		"dockerswarm",
 		time.Duration(conf.RefreshInterval),

@@ -118,7 +118,7 @@ const appListPath string = "/v2/apps/?embed=apps.tasks"
 
 // Discovery provides service discovery based on a Marathon instance.
 type Discovery struct {
-	*refresh.Discovery
+	discovery.Discoverer
 	client      *http.Client
 	servers     []string
 	lastRefresh map[string]*targetgroup.Group
@@ -146,7 +146,7 @@ func NewDiscovery(conf SDConfig, logger log.Logger) (*Discovery, error) {
 		servers:    conf.Servers,
 		appsClient: fetchApps,
 	}
-	d.Discovery = refresh.NewDiscovery(
+	d.Discoverer = refresh.NewDiscovery(
 		logger,
 		"marathon",
 		time.Duration(conf.RefreshInterval),

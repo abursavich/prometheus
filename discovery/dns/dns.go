@@ -114,7 +114,7 @@ func (c *SDConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 // Discovery periodically performs DNS-SD requests. It implements
 // the Discoverer interface.
 type Discovery struct {
-	*refresh.Discovery
+	discovery.Discoverer
 	names  []string
 	port   int
 	qtype  uint16
@@ -145,7 +145,7 @@ func NewDiscovery(conf SDConfig, logger log.Logger) *Discovery {
 		logger:   logger,
 		lookupFn: lookupWithSearchPath,
 	}
-	d.Discovery = refresh.NewDiscovery(
+	d.Discoverer = refresh.NewDiscovery(
 		logger,
 		"dns",
 		time.Duration(conf.RefreshInterval),

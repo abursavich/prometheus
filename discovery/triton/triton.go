@@ -132,7 +132,7 @@ type ComputeNodeDiscoveryResponse struct {
 // Discovery periodically performs Triton-SD requests. It implements
 // the Discoverer interface.
 type Discovery struct {
-	*refresh.Discovery
+	discovery.Discoverer
 	client   *http.Client
 	interval time.Duration
 	sdConfig *SDConfig
@@ -159,7 +159,7 @@ func New(logger log.Logger, conf *SDConfig) (*Discovery, error) {
 		interval: time.Duration(conf.RefreshInterval),
 		sdConfig: conf,
 	}
-	d.Discovery = refresh.NewDiscovery(
+	d.Discoverer = refresh.NewDiscovery(
 		logger,
 		"triton",
 		time.Duration(conf.RefreshInterval),
