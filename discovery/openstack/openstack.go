@@ -14,7 +14,6 @@
 package openstack
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -29,8 +28,9 @@ import (
 
 	"github.com/prometheus/prometheus/discovery"
 	"github.com/prometheus/prometheus/discovery/refresh"
-	"github.com/prometheus/prometheus/discovery/targetgroup"
 )
+
+const openstackName = "openstack"
 
 // DefaultSDConfig is the default OpenStack SD configuration.
 var DefaultSDConfig = SDConfig{
@@ -66,11 +66,15 @@ type SDConfig struct {
 }
 
 // Name returns the name of the Config.
-func (*SDConfig) Name() string { return "openstack" }
+func (*SDConfig) Name() string { return openstackName }
 
 // NewDiscoverer returns a Discoverer for the Config.
 func (c *SDConfig) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
-	return NewDiscovery(c, opts.Logger)
+	r, err := newRefresher(c, opts.Logger)
+	if err != nil {
+		return nil, err
+	}
+	return refresh.NewDiscoverer(opts.Logger, time.Duration(c.RefreshInterval), r), nil
 }
 
 // SetDirectory joins any relative file paths with dir.
@@ -129,26 +133,7 @@ func (c *SDConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return nil
 }
 
-type refresher interface {
-	refresh(context.Context) ([]*targetgroup.Group, error)
-}
-
-// NewDiscovery returns a new OpenStack Discoverer which periodically refreshes its targets.
-func NewDiscovery(conf *SDConfig, l log.Logger) (discovery.Discoverer, error) {
-	r, err := newRefresher(conf, l)
-	if err != nil {
-		return nil, err
-	}
-	return refresh.NewDiscovery(
-		l,
-		"openstack",
-		time.Duration(conf.RefreshInterval),
-		r.refresh,
-	), nil
-
-}
-
-func newRefresher(conf *SDConfig, l log.Logger) (refresher, error) {
+func newRefresher(conf *SDConfig, l log.Logger) (refresh.Refresher, error) {
 	var opts gophercloud.AuthOptions
 	if conf.IdentityEndpoint == "" {
 		var err error

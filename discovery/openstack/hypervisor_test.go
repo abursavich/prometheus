@@ -19,6 +19,7 @@ import (
 	"testing"
 
 	"github.com/prometheus/common/model"
+	"github.com/prometheus/prometheus/discovery/refresh"
 	"github.com/prometheus/prometheus/util/testutil"
 )
 
@@ -35,7 +36,7 @@ func (s *OpenstackSDHypervisorTestSuite) SetupTest(t *testing.T) {
 	s.Mock.HandleAuthSuccessfully()
 }
 
-func (s *OpenstackSDHypervisorTestSuite) openstackAuthSuccess() (refresher, error) {
+func (s *OpenstackSDHypervisorTestSuite) openstackAuthSuccess() (refresh.Refresher, error) {
 	conf := SDConfig{
 		IdentityEndpoint: s.Mock.Endpoint(),
 		Password:         "test",
@@ -48,13 +49,13 @@ func (s *OpenstackSDHypervisorTestSuite) openstackAuthSuccess() (refresher, erro
 }
 
 func TestOpenstackSDHypervisorRefresh(t *testing.T) {
-
 	mock := &OpenstackSDHypervisorTestSuite{}
 	mock.SetupTest(t)
 
-	hypervisor, _ := mock.openstackAuthSuccess()
+	r, err := mock.openstackAuthSuccess()
+	testutil.Ok(t, err)
 	ctx := context.Background()
-	tgs, err := hypervisor.refresh(ctx)
+	tgs, err := r.Refresh(ctx)
 	testutil.Equals(t, 1, len(tgs))
 	tg := tgs[0]
 	testutil.Ok(t, err)
@@ -91,10 +92,11 @@ func TestOpenstackSDHypervisorRefreshWithDoneContext(t *testing.T) {
 	mock := &OpenstackSDHypervisorTestSuite{}
 	mock.SetupTest(t)
 
-	hypervisor, _ := mock.openstackAuthSuccess()
+	r, err := mock.openstackAuthSuccess()
+	testutil.Ok(t, err)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	_, err := hypervisor.refresh(ctx)
+	_, err = r.Refresh(ctx)
 	testutil.NotOk(t, err)
 	testutil.Assert(t, strings.Contains(err.Error(), context.Canceled.Error()), "%q doesn't contain %q", err, context.Canceled)
 }
