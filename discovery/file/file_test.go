@@ -147,7 +147,7 @@ func (t *testRunner) run(files ...string) {
 	ctx, cancel := context.WithCancel(context.Background())
 	t.cancelSD = cancel
 	go func() {
-		NewDiscovery(
+		newDiscoverer(
 			&SDConfig{
 				Files: files,
 				// Setting a high refresh interval to make sure that the tests only
