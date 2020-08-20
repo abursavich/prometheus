@@ -26,7 +26,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-kit/kit/log"
 	"github.com/pkg/errors"
 	"github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
@@ -38,8 +37,10 @@ import (
 )
 
 const (
+	marathonName = "marathon"
+
 	// metaLabelPrefix is the meta prefix used for all meta labels in this discovery.
-	metaLabelPrefix = model.MetaLabelPrefix + "marathon_"
+	metaLabelPrefix = model.MetaLabelPrefix + marathonName + "_"
 	// appLabelPrefix is the prefix for the application labels.
 	appLabelPrefix = metaLabelPrefix + "app_label_"
 
@@ -78,11 +79,15 @@ type SDConfig struct {
 }
 
 // Name returns the name of the Config.
-func (*SDConfig) Name() string { return "marathon" }
+func (*SDConfig) Name() string { return marathonName }
 
 // NewDiscoverer returns a Discoverer for the Config.
 func (c *SDConfig) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
-	return NewDiscovery(*c, opts.Logger)
+	r, err := newRefresher(c)
+	if err != nil {
+		return nil, err
+	}
+	return refresh.NewDiscoverer(opts.Logger, time.Duration(c.RefreshInterval), r), nil
 }
 
 // SetDirectory joins any relative file paths with dir.
@@ -116,17 +121,14 @@ func (c *SDConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 
 const appListPath string = "/v2/apps/?embed=apps.tasks"
 
-// Discovery provides service discovery based on a Marathon instance.
-type Discovery struct {
-	discovery.Discoverer
+type refresher struct {
 	client      *http.Client
 	servers     []string
 	lastRefresh map[string]*targetgroup.Group
 	appsClient  appListClient
 }
 
-// NewDiscovery returns a new Marathon Discovery.
-func NewDiscovery(conf SDConfig, logger log.Logger) (*Discovery, error) {
+func newRefresher(conf *SDConfig) (*refresher, error) {
 	rt, err := config.NewRoundTripperFromConfig(conf.HTTPClientConfig, "marathon_sd", false, false)
 	if err != nil {
 		return nil, err
@@ -141,18 +143,11 @@ func NewDiscovery(conf SDConfig, logger log.Logger) (*Discovery, error) {
 		return nil, err
 	}
 
-	d := &Discovery{
+	return &refresher{
 		client:     &http.Client{Transport: rt},
 		servers:    conf.Servers,
 		appsClient: fetchApps,
-	}
-	d.Discoverer = refresh.NewDiscovery(
-		logger,
-		"marathon",
-		time.Duration(conf.RefreshInterval),
-		d.refresh,
-	)
-	return d, nil
+	}, nil
 }
 
 type authTokenRoundTripper struct {
@@ -203,8 +198,10 @@ func (rt *authTokenFileRoundTripper) RoundTrip(request *http.Request) (*http.Res
 	return rt.rt.RoundTrip(request)
 }
 
-func (d *Discovery) refresh(ctx context.Context) ([]*targetgroup.Group, error) {
-	targetMap, err := d.fetchTargetGroups(ctx)
+func (*refresher) Name() string { return marathonName }
+
+func (r *refresher) Refresh(ctx context.Context) ([]*targetgroup.Group, error) {
+	targetMap, err := r.fetchTargetGroups(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -221,20 +218,20 @@ func (d *Discovery) refresh(ctx context.Context) ([]*targetgroup.Group, error) {
 	}
 
 	// Remove services which did disappear.
-	for source := range d.lastRefresh {
+	for source := range r.lastRefresh {
 		_, ok := targetMap[source]
 		if !ok {
 			all = append(all, &targetgroup.Group{Source: source})
 		}
 	}
 
-	d.lastRefresh = targetMap
+	r.lastRefresh = targetMap
 	return all, nil
 }
 
-func (d *Discovery) fetchTargetGroups(ctx context.Context) (map[string]*targetgroup.Group, error) {
-	url := randomAppsURL(d.servers)
-	apps, err := d.appsClient(ctx, d.client, url)
+func (r *refresher) fetchTargetGroups(ctx context.Context) (map[string]*targetgroup.Group, error) {
+	url := randomAppsURL(r.servers)
+	apps, err := r.appsClient(ctx, r.client, url)
 	if err != nil {
 		return nil, err
 	}
