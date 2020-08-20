@@ -46,14 +46,14 @@ func TestDigitalOceanSDRefresh(t *testing.T) {
 
 	cfg := DefaultSDConfig
 	cfg.HTTPClientConfig.BearerToken = tokenID
-	d, err := NewDiscovery(&cfg, log.NewNopLogger())
+	r, err := newRefresher(&cfg, log.NewNopLogger())
 	testutil.Ok(t, err)
 	endpoint, err := url.Parse(sdmock.Mock.Endpoint())
 	testutil.Ok(t, err)
-	d.client.BaseURL = endpoint
+	r.client.BaseURL = endpoint
 
 	ctx := context.Background()
-	tgs, err := d.refresh(ctx)
+	tgs, err := r.Refresh(ctx)
 	testutil.Ok(t, err)
 
 	testutil.Equals(t, 1, len(tgs))

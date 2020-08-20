@@ -34,7 +34,8 @@ import (
 )
 
 const (
-	doLabel            = model.MetaLabelPrefix + "digitalocean_"
+	doName             = "digitalocean"
+	doLabel            = model.MetaLabelPrefix + doName + "_"
 	doLabelID          = doLabel + "droplet_id"
 	doLabelName        = doLabel + "droplet_name"
 	doLabelImage       = doLabel + "image"
@@ -68,11 +69,15 @@ type SDConfig struct {
 }
 
 // Name returns the name of the Config.
-func (*SDConfig) Name() string { return "digitalocean" }
+func (*SDConfig) Name() string { return doName }
 
 // NewDiscoverer returns a Discoverer for the Config.
 func (c *SDConfig) NewDiscoverer(opts discovery.DiscovererOptions) (discovery.Discoverer, error) {
-	return NewDiscovery(c, opts.Logger)
+	r, err := newRefresher(c, opts.Logger)
+	if err != nil {
+		return nil, err
+	}
+	return refresh.NewDiscoverer(opts.Logger, time.Duration(c.RefreshInterval), r), nil
 }
 
 // SetDirectory joins any relative file paths with dir.
@@ -91,26 +96,18 @@ func (c *SDConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return nil
 }
 
-// Discovery periodically performs DigitalOcean requests. It implements
-// the Discoverer interface.
-type Discovery struct {
-	discovery.Discoverer
+type refresher struct {
 	client *godo.Client
 	port   int
 }
 
-// NewDiscovery returns a new Discovery which periodically refreshes its targets.
-func NewDiscovery(conf *SDConfig, logger log.Logger) (*Discovery, error) {
-	d := &Discovery{
-		port: conf.Port,
-	}
-
+func newRefresher(conf *SDConfig, logger log.Logger) (*refresher, error) {
 	rt, err := config.NewRoundTripperFromConfig(conf.HTTPClientConfig, "digitalocean_sd", false, false)
 	if err != nil {
 		return nil, err
 	}
 
-	d.client, err = godo.New(
+	client, err := godo.New(
 		&http.Client{
 			Transport: rt,
 			Timeout:   time.Duration(conf.RefreshInterval),
@@ -120,22 +117,20 @@ func NewDiscovery(conf *SDConfig, logger log.Logger) (*Discovery, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error setting up digital ocean agent: %w", err)
 	}
-
-	d.Discoverer = refresh.NewDiscovery(
-		logger,
-		"digitalocean",
-		time.Duration(conf.RefreshInterval),
-		d.refresh,
-	)
-	return d, nil
+	return &refresher{
+		client: client,
+		port:   conf.Port,
+	}, nil
 }
 
-func (d *Discovery) refresh(ctx context.Context) ([]*targetgroup.Group, error) {
+func (*refresher) Name() string { return doName }
+
+func (r *refresher) Refresh(ctx context.Context) ([]*targetgroup.Group, error) {
 	tg := &targetgroup.Group{
 		Source: "DigitalOcean",
 	}
 
-	droplets, err := d.listDroplets()
+	droplets, err := r.listDroplets()
 	if err != nil {
 		return nil, err
 	}
@@ -169,7 +164,7 @@ func (d *Discovery) refresh(ctx context.Context) ([]*targetgroup.Group, error) {
 			doLabelStatus:      model.LabelValue(droplet.Status),
 		}
 
-		addr := net.JoinHostPort(publicIPv4, strconv.FormatUint(uint64(d.port), 10))
+		addr := net.JoinHostPort(publicIPv4, strconv.FormatUint(uint64(r.port), 10))
 		labels[model.AddressLabel] = model.LabelValue(addr)
 
 		if len(droplet.Features) > 0 {
@@ -191,13 +186,13 @@ func (d *Discovery) refresh(ctx context.Context) ([]*targetgroup.Group, error) {
 	return []*targetgroup.Group{tg}, nil
 }
 
-func (d *Discovery) listDroplets() ([]godo.Droplet, error) {
+func (r *refresher) listDroplets() ([]godo.Droplet, error) {
 	var (
 		droplets []godo.Droplet
 		opts     = &godo.ListOptions{}
 	)
 	for {
-		paginatedDroplets, resp, err := d.client.Droplets.List(context.Background(), opts)
+		paginatedDroplets, resp, err := r.client.Droplets.List(context.Background(), opts)
 		if err != nil {
 			return nil, fmt.Errorf("error while listing droplets page %d: %w", opts.Page, err)
 		}
